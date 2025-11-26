@@ -220,7 +220,7 @@ h1 {
 
 /* VISUAL BLOCKS --------------------------------------------------- */
 .visuals-row {
-  margin-top: 26px;
+  margin-top: 40px;      /* clears the yellow textbox */
   display: flex;
   gap: 24px;
   justify-content: space-around;
@@ -236,9 +236,31 @@ h1 {
 .visual-title {
   font-size: 1.3rem;
   font-weight: 700;
+  margin-bottom: 0;
 }
 
-/* IMAGE SIZING */
+/* inner row: image + multiplier side by side */
+.visual-inner {
+  display: flex;
+  align-items: center;      /* vertical centre alignment */
+  justify-content: center;
+  gap: 28px;
+  margin-top: 72px;         /* space between title and image row */
+}
+
+/* IMAGE SIZING + VERTICAL CENTRING */
+.unit-image-wrapper {
+  max-width: 100%;
+  height: 230px;           /* default height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.unit-image-wrapper.wide {
+  height: 300px;           /* for any wide images if you use them */
+}
+
 .unit-image-wrapper img {
   max-width: 100%;
   height: auto;
@@ -246,6 +268,16 @@ h1 {
 
 .unit-image-wrapper.ones img {
   max-width: 80px;
+}
+
+/* MULTIPLIER TEXT (hand-drawn feel) */
+.visual-multiplier {
+  font-size: 2.4rem;
+  font-weight: 700;
+  font-family: "Comic Neue", "Comic Sans MS", "Marker Felt", cursive,
+    system-ui, -apple-system, sans-serif;
+  white-space: nowrap;   /* keep "× 32" on one line */
+  flex-shrink: 0;        /* don’t squash it so it wraps */
 }
 
 /* CHALLENGE PANEL ------------------------------------------------- */
@@ -281,6 +313,15 @@ h1 {
   }
   .pv-label { height: 100px; }
   .pv-digit { font-size: 2.3rem; }
+  .unit-image-wrapper {
+    height: 190px;
+  }
+  .unit-image-wrapper.wide {
+    height: 240px;
+  }
+  .visual-multiplier {
+    font-size: 2rem;
+  }
 }
 </style>
 </head>
@@ -317,11 +358,17 @@ h1 {
   <div id="visualsRow" class="visuals-row hidden">
     <div class="visual-block" id="leftVisualBlock">
       <div class="visual-title" id="leftVisualTitle"></div>
-      <div class="unit-image-wrapper" id="leftImageWrapper"></div>
+      <div class="visual-inner">
+        <div class="unit-image-wrapper" id="leftImageWrapper"></div>
+        <div class="visual-multiplier" id="leftMultiplier"></div>
+      </div>
     </div>
     <div class="visual-block" id="rightVisualBlock">
       <div class="visual-title" id="rightVisualTitle"></div>
-      <div class="unit-image-wrapper ones" id="rightImageWrapper"></div>
+      <div class="visual-inner">
+        <div class="unit-image-wrapper ones" id="rightImageWrapper"></div>
+        <div class="visual-multiplier" id="rightMultiplier"></div>
+      </div>
     </div>
   </div>
 
@@ -342,6 +389,8 @@ const leftVisualTitle = document.getElementById("leftVisualTitle");
 const rightVisualTitle = document.getElementById("rightVisualTitle");
 const leftImageWrapper = document.getElementById("leftImageWrapper");
 const rightImageWrapper = document.getElementById("rightImageWrapper");
+const leftMultiplier = document.getElementById("leftMultiplier");
+const rightMultiplier = document.getElementById("rightMultiplier");
 const exploreBtn = document.getElementById("exploreBtn");
 const challengeBtn = document.getElementById("challengeBtn");
 
@@ -445,7 +494,9 @@ function updateExploreView() {
     return;
   }
 
-  const { idx, leftCount, rightCount, leftLabel } = getSplitData();
+  const data = getSplitData();
+  if (!data) return;
+  const { idx, leftCount, rightCount, leftLabel } = data;
   const formatted = formatWithSpaces(currentValue);
 
   if (idx === 4) {
@@ -486,12 +537,15 @@ function updateExploreView() {
     4: "img-ones.png"
   };
 
+  // left image (toggle wide class only if you use a wide asset)
+  leftImageWrapper.classList.toggle("wide", false); // set to (idx === 0) if your 10k image is wide
   const leftImg = document.createElement("img");
   leftImg.src = imgs[idx];
   leftImageWrapper.appendChild(leftImg);
 
   if (idx === 4 || rightCount === 0) {
     rightVisualBlock.classList.add("hidden");
+    rightMultiplier.textContent = "";
   } else {
     rightVisualBlock.classList.remove("hidden");
     const r = document.createElement("img");
@@ -499,12 +553,22 @@ function updateExploreView() {
     rightImageWrapper.appendChild(r);
   }
 
+  /* multipliers in explore mode */
+  leftMultiplier.textContent = `× ${leftCount}`;
+  if (idx === 4 || rightCount === 0) {
+    rightMultiplier.textContent = "";
+  } else {
+    rightMultiplier.textContent = `× ${rightCount}`;
+  }
+
   visualsRow.classList.remove("hidden");
 }
 
 /* ---------------------- CHALLENGE MODE -------------------------- */
 function buildChallengeRowHTML(show) {
-  const { idx, leftCount, rightCount, leftLabel } = getSplitData();
+  const data = getSplitData();
+  if (!data) return "";
+  const { idx, leftCount, rightCount, leftLabel } = data;
   const formatted = formatWithSpaces(currentValue);
 
   const L = show ? leftCount : "?";
@@ -565,7 +629,9 @@ function updateChallengeView() {
     });
   }
 
-  const { idx, leftCount, rightCount, leftLabel } = getSplitData();
+  const data = getSplitData();
+  if (!data) return;
+  const { idx, leftCount, rightCount, leftLabel } = data;
 
   leftVisualTitle.innerHTML = `<span class="number">${challengeRevealed ? leftCount : "?"}</span> ${leftLabel}`;
   rightVisualTitle.innerHTML = `<span class="number">${challengeRevealed ? rightCount : "?"}</span> ones`;
@@ -581,17 +647,31 @@ function updateChallengeView() {
     4: "img-ones.png"
   };
 
+  leftImageWrapper.classList.toggle("wide", false); // set to (idx === 0) if using a wide 10k image
   const leftImg = document.createElement("img");
   leftImg.src = imgs[idx];
   leftImageWrapper.appendChild(leftImg);
 
   if (idx === 4 || rightCount === 0) {
     rightVisualBlock.classList.add("hidden");
+    rightMultiplier.textContent = "";
   } else {
     rightVisualBlock.classList.remove("hidden");
     const r = document.createElement("img");
     r.src = "img-ones.png";
     rightImageWrapper.appendChild(r);
+  }
+
+  /* multipliers in challenge mode */
+  if (idx === 4) {
+    leftMultiplier.textContent = challengeRevealed ? `× ${leftCount}` : "× ?";
+    rightMultiplier.textContent = "";
+  } else if (rightCount === 0) {
+    leftMultiplier.textContent = challengeRevealed ? `× ${leftCount}` : "× ?";
+    rightMultiplier.textContent = "";
+  } else {
+    leftMultiplier.textContent = challengeRevealed ? `× ${leftCount}` : "× ?";
+    rightMultiplier.textContent = challengeRevealed ? `× ${rightCount}` : "× ?";
   }
 
   visualsRow.classList.remove("hidden");
@@ -604,6 +684,8 @@ function updateAll() {
   if (!currentValue) {
     resultRow.classList.add("hidden");
     visualsRow.classList.add("hidden");
+    leftMultiplier.textContent = "";
+    rightMultiplier.textContent = "";
     return;
   }
   if (currentMode === "explore") updateExploreView();
