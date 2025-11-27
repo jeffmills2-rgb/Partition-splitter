@@ -126,7 +126,7 @@ h1 {
 }
 
 .pv-label {
-  height: 120px;
+  height: 150px;
 }
 
 .pv-label span {
@@ -171,7 +171,8 @@ h1 {
   position: relative;
 }
 
-/* Span from first internal grid line (1/5) to right edge (5/5) */
+/* Span approx from first internal grid line to the edge of the ones
+   (tuned for 6 columns) */
 #splitSlider {
   width: 80%;
   margin-left: 20%;
@@ -311,7 +312,7 @@ h1 {
     --cell-width: 110px;
     --cell-height: 150px;
   }
-  .pv-label { height: 100px; }
+  .pv-label { height: 140px; }
   .pv-digit { font-size: 2.3rem; }
   .unit-image-wrapper {
     height: 190px;
@@ -337,8 +338,8 @@ h1 {
   </div>
 
   <div class="top-row">
-    <label>Enter a whole number (up to 5 digits):</label>
-    <input id="numberInput" placeholder="e.g. 32554" />
+    <label>Enter a whole number (up to 6 digits):</label>
+    <input id="numberInput" placeholder="e.g. 325541" />
   </div>
   <div id="errorMessage"></div>
 
@@ -349,7 +350,8 @@ h1 {
   <div class="split-slider-row">
     <div class="split-slider-label">Drag to choose a split:</div>
     <div class="split-slider-container">
-      <input type="range" id="splitSlider" min="0" max="4" value="2" />
+      <!-- now supports 6 positions (0–5) -->
+      <input type="range" id="splitSlider" min="0" max="5" value="3" />
     </div>
   </div>
 
@@ -375,7 +377,14 @@ h1 {
 </div>
 
 <script>
-const placeNames = ["ten-thousands","thousands","hundreds","tens","ones"];
+const placeNames = [
+  "hundred-thousands",
+  "ten-thousands",
+  "thousands",
+  "hundreds",
+  "tens",
+  "ones"
+];
 
 const inputEl = document.getElementById("numberInput");
 const errorEl = document.getElementById("errorMessage");
@@ -422,10 +431,10 @@ function parseInput() {
     setError("Digits only.");
     return;
   }
-  if (raw.length > 5) {
+  if (raw.length > 6) {
     currentValue = null;
     digits = "";
-    setError("Max 5 digits.");
+    setError("Max 6 digits.");
     return;
   }
   const n = Number(raw);
@@ -444,8 +453,9 @@ function renderGrid() {
   gridEl.innerHTML = "";
   if (!currentValue) return;
 
-  const pad = digits.padStart(5, " ");
-  for (let i = 0; i < 5; i++) {
+  const places = placeNames.length;
+  const pad = digits.padStart(places, " ");
+  for (let i = 0; i < places; i++) {
     const col = document.createElement("div");
     col.className = "pv-column";
 
@@ -470,20 +480,22 @@ function updateGridSplitHighlight() {
   if (currentMode === "challenge" && !challengeRevealed) return;
 
   const idx = Number(splitSlider.value);
-  if (idx >= 0 && idx <= 4) {
+  if (idx >= 0 && idx < cols.length) {
     cols[idx].classList.add("split-left");
   }
 }
 
 function getSplitData() {
-  if (!currentValue) return null;
+  if (!currentValue && currentValue !== 0) return null;
   const idx = Number(splitSlider.value);
-  const power = 4 - idx;
+  const places = placeNames.length;
+  const maxPower = places - 1;   // e.g. 6 places -> maxPower = 5
+  const power = maxPower - idx;
   const base = 10 ** power;
   const leftCount = Math.floor(currentValue / base);
   const rightCount = currentValue % base;
   const leftLabel = placeNames[idx].replace("-", " ");
-  return { idx, leftCount, rightCount, leftLabel };
+  return { idx, leftCount, rightCount, leftLabel, places };
 }
 
 /* ---------------------- EXPLORE MODE ---------------------------- */
@@ -496,10 +508,11 @@ function updateExploreView() {
 
   const data = getSplitData();
   if (!data) return;
-  const { idx, leftCount, rightCount, leftLabel } = data;
+  const { idx, leftCount, rightCount, leftLabel, places } = data;
   const formatted = formatWithSpaces(currentValue);
+  const lastIndex = places - 1;
 
-  if (idx === 4) {
+  if (idx === lastIndex) {
     resultRow.innerHTML = `
       <span class="number">${formatted}</span>
       is the same as
@@ -530,20 +543,21 @@ function updateExploreView() {
   rightImageWrapper.innerHTML = "";
 
   const imgs = {
-    0: "img-ten-thousands.png",
-    1: "img-thousands.png",
-    2: "img-hundreds.png",
-    3: "img-tens.png",
-    4: "img-ones.png"
+    0: "img-hundred-thousands.png",
+    1: "img-ten-thousands.png",
+    2: "img-thousands.png",
+    3: "img-hundreds.png",
+    4: "img-tens.png",
+    5: "img-ones.png"
   };
 
   // left image (toggle wide class only if you use a wide asset)
-  leftImageWrapper.classList.toggle("wide", false); // set to (idx === 0) if your 10k image is wide
+  leftImageWrapper.classList.toggle("wide", false); // set to (idx === 0) if your 100k image is wide
   const leftImg = document.createElement("img");
   leftImg.src = imgs[idx];
   leftImageWrapper.appendChild(leftImg);
 
-  if (idx === 4 || rightCount === 0) {
+  if (idx === lastIndex || rightCount === 0) {
     rightVisualBlock.classList.add("hidden");
     rightMultiplier.textContent = "";
   } else {
@@ -555,7 +569,7 @@ function updateExploreView() {
 
   /* multipliers in explore mode */
   leftMultiplier.textContent = `× ${leftCount}`;
-  if (idx === 4 || rightCount === 0) {
+  if (idx === lastIndex || rightCount === 0) {
     rightMultiplier.textContent = "";
   } else {
     rightMultiplier.textContent = `× ${rightCount}`;
@@ -568,13 +582,14 @@ function updateExploreView() {
 function buildChallengeRowHTML(show) {
   const data = getSplitData();
   if (!data) return "";
-  const { idx, leftCount, rightCount, leftLabel } = data;
+  const { idx, leftCount, rightCount, leftLabel, places } = data;
   const formatted = formatWithSpaces(currentValue);
+  const lastIndex = places - 1;
 
   const L = show ? leftCount : "?";
   const R = show ? rightCount : "?";
 
-  if (idx === 4) {
+  if (idx === lastIndex) {
     return `
       <span class="number">${formatted}</span>
       is the same as
@@ -631,7 +646,8 @@ function updateChallengeView() {
 
   const data = getSplitData();
   if (!data) return;
-  const { idx, leftCount, rightCount, leftLabel } = data;
+  const { idx, leftCount, rightCount, leftLabel, places } = data;
+  const lastIndex = places - 1;
 
   leftVisualTitle.innerHTML = `<span class="number">${challengeRevealed ? leftCount : "?"}</span> ${leftLabel}`;
   rightVisualTitle.innerHTML = `<span class="number">${challengeRevealed ? rightCount : "?"}</span> ones`;
@@ -640,19 +656,20 @@ function updateChallengeView() {
   rightImageWrapper.innerHTML = "";
 
   const imgs = {
-    0: "img-ten-thousands.png",
-    1: "img-thousands.png",
-    2: "img-hundreds.png",
-    3: "img-tens.png",
-    4: "img-ones.png"
+    0: "img-hundred-thousands.png",
+    1: "img-ten-thousands.png",
+    2: "img-thousands.png",
+    3: "img-hundreds.png",
+    4: "img-tens.png",
+    5: "img-ones.png"
   };
 
-  leftImageWrapper.classList.toggle("wide", false); // set to (idx === 0) if using a wide 10k image
+  leftImageWrapper.classList.toggle("wide", false); // set to (idx === 0) if using a wide 100k image
   const leftImg = document.createElement("img");
   leftImg.src = imgs[idx];
   leftImageWrapper.appendChild(leftImg);
 
-  if (idx === 4 || rightCount === 0) {
+  if (idx === lastIndex || rightCount === 0) {
     rightVisualBlock.classList.add("hidden");
     rightMultiplier.textContent = "";
   } else {
@@ -663,7 +680,7 @@ function updateChallengeView() {
   }
 
   /* multipliers in challenge mode */
-  if (idx === 4) {
+  if (idx === lastIndex) {
     leftMultiplier.textContent = challengeRevealed ? `× ${leftCount}` : "× ?";
     rightMultiplier.textContent = "";
   } else if (rightCount === 0) {
@@ -707,13 +724,14 @@ splitSlider.addEventListener("input", () => {
 window.addEventListener("keydown", (e) => {
   if (currentMode !== "explore") return;
   let v = Number(splitSlider.value);
+  const maxIndex = placeNames.length - 1;
   if (e.key === "ArrowLeft") {
     e.preventDefault();
     splitSlider.value = Math.max(0, v - 1);
   }
   if (e.key === "ArrowRight") {
     e.preventDefault();
-    splitSlider.value = Math.min(4, v + 1);
+    splitSlider.value = Math.min(maxIndex, v + 1);
   }
   updateAll();
 });
@@ -730,13 +748,13 @@ challengeBtn.addEventListener("click", () => {
   currentMode = "challenge";
   exploreBtn.classList.remove("active");
   challengeBtn.classList.add("active");
-  splitSlider.value = Math.floor(Math.random() * 5);
+  splitSlider.value = Math.floor(Math.random() * placeNames.length); // 0..5
   challengeRevealed = false;
   updateAll();
 });
 
 /* INITIAL --------------------------------------------------------- */
-inputEl.value = "32554";
+inputEl.value = "325541";
 parseInput();
 updateAll();
 </script>
