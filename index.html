@@ -334,6 +334,7 @@ h1 {
     <div class="mode-toggle">
       <button id="exploreBtn" class="active">Explore</button>
       <button id="challengeBtn">Challenge</button>
+      <button id="flashBtn">Flash cards</button>
     </div>
   </div>
 
@@ -402,6 +403,7 @@ const leftMultiplier = document.getElementById("leftMultiplier");
 const rightMultiplier = document.getElementById("rightMultiplier");
 const exploreBtn = document.getElementById("exploreBtn");
 const challengeBtn = document.getElementById("challengeBtn");
+const flashBtn = document.getElementById("flashBtn");
 
 let currentMode = "explore";
 let currentValue = null;
@@ -751,6 +753,11 @@ challengeBtn.addEventListener("click", () => {
   splitSlider.value = Math.floor(Math.random() * placeNames.length); // 0..5
   challengeRevealed = false;
   updateAll();
+});
+
+// NEW: flash cards nav
+flashBtn.addEventListener("click", () => {
+  window.location.href = "partition-flash.html";
 });
 
 /* INITIAL --------------------------------------------------------- */
