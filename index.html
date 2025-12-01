@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Partition Splitter</title>
+<title>Partition Splitter – Group Input Version</title>
 <style>
 :root {
   --cell-width: 150px;
   --cell-height: 180px;
   --border-color: #444;
   --label-color: #333;
-  --digit-color: #0066cc;
+  --digit-color: #0066cc; /* final / standard-form digits (blue) */
 }
 
 /* GLOBAL ---------------------------------------------------------- */
@@ -24,6 +24,13 @@ body {
 h1 {
   margin: 0;
   font-size: 2rem;
+}
+
+/* Small instruction line above the card */
+.page-instruction {
+  margin: 0 0 8px 4px;
+  font-size: 1rem;
+  color: #111827;
 }
 
 .app-container {
@@ -67,26 +74,47 @@ h1 {
   color: #fff;
 }
 
-/* INPUT ---------------------------------------------------------- */
-.top-row {
+/* ACTION BUTTON ROW ---------------------------------------------- */
+.action-row {
+  margin-top: 12px;
   display: flex;
-  gap: 14px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
-#numberInput {
-  padding: 10px 14px;
-  font-size: 1.3rem;
-  border-radius: 8px;
-  border: 1px solid #9ca3af;
-  flex: 1;
-  min-width: 240px;
+.action-row button {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 0.95rem;
+  cursor: pointer;
 }
 
+#resetBtn {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+#animateBtn {
+  background: #10b981;
+  color: #ffffff;
+}
+
+#returnBtn {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+#enterBtn {
+  background: #2563eb;
+  color: #fff;
+}
+
+.hidden { display: none; }
+
+/* ERROR MESSAGE --------------------------------------------------- */
 #errorMessage {
-  margin-top: 4px;
+  margin-top: 6px;
   color: #b91c1c;
   font-size: 0.9rem;
   display: none;
@@ -95,6 +123,7 @@ h1 {
 /* PLACE VALUE GRID ------------------------------------------------ */
 .pv-wrapper {
   margin-top: 10px;
+  margin-bottom: 12px;   /* extra space above buttons */
   padding: 16px;
   background: #f9faff;
   border-radius: 12px;
@@ -119,6 +148,7 @@ h1 {
   justify-content: center;
   align-items: center;
   background: #fff;
+  position: relative; /* for bubbles & annotations */
 }
 
 .pv-column:last-child .pv-cell {
@@ -136,19 +166,128 @@ h1 {
   color: var(--label-color);
 }
 
+/* digit / standard cells ----------------------------------------- */
 .pv-digit {
   height: var(--cell-height);
   font-size: 3rem;
   font-weight: 700;
-  color: var(--digit-color);
+  color: var(--digit-color); /* blue */
 }
 
 .pv-digit.empty {
   color: transparent;
 }
 
+/* image row cells ------------------------------------------------- */
+.pv-image {
+  height: 110px;              /* how tall the image cell is */
+}
+
+.pv-image-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* THIS controls the picture size */
+.pv-image-inner img {
+  max-height: 70%;
+  max-width: 70%;
+  height: auto;
+  width: auto;
+  object-fit: contain;
+}
+
+/* INPUT MODE: invisible input + coloured overlay ----------------- */
+.pv-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  text-align: center;
+  font-size: 2.6rem;
+  font-weight: 700;
+  background: transparent;
+  color: transparent;         /* text itself hidden */
+  caret-color: #2563eb;       /* caret still visible */
+}
+
+.pv-input::placeholder {
+  color: #d1d5db;
+}
+
+.pv-input-display {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.6rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.pv-multi-red {
+  color: #e11d48;  /* red for tens/hundreds groups */
+}
+
+.pv-multi-blue {
+  color: var(--digit-color); /* blue for ones digit */
+}
+
+/* highlight on split --------------------------------------------- */
 .pv-column.split-left .pv-digit {
   border-right: 4px solid #2563eb;
+}
+
+/* CARRY ANIMATION ------------------------------------------------- */
+.carry-bubble {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 4rem;
+  font-weight: 700;
+  color: #e11d48;
+  pointer-events: none;
+  animation: move-left 3.2s ease-out forwards;
+}
+
+.carry-annotation {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #e11d48;
+  background: rgba(255,255,255,0.98);
+  padding: 6px 14px;
+  border-radius: 8px;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: fade-out 3.2s ease-out forwards;
+}
+
+@keyframes move-left {
+  from {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+  to {
+    transform: translate(calc(-50% + var(--dx, -150%)), -50%);
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  0%   { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* SLIDER ---------------------------------------------------------- */
@@ -163,7 +302,6 @@ h1 {
   margin-bottom: 4px;
 }
 
-/* Match inner grid width (pv-wrapper has 16px padding on each side) */
 .split-slider-container {
   width: calc(100% - 32px);
   margin-left: 16px;
@@ -171,8 +309,6 @@ h1 {
   position: relative;
 }
 
-/* Span approx from first internal grid line to the edge of the ones
-   (tuned for 6 columns) */
 #splitSlider {
   width: 83%;
   margin-left: 16%;
@@ -183,7 +319,6 @@ h1 {
   outline: none;
 }
 
-/* HANDLE */
 #splitSlider::-webkit-slider-thumb {
   appearance: none;
   width: 24px;
@@ -221,7 +356,7 @@ h1 {
 
 /* VISUAL BLOCKS --------------------------------------------------- */
 .visuals-row {
-  margin-top: 40px;      /* clears the yellow textbox */
+  margin-top: 40px;
   display: flex;
   gap: 24px;
   justify-content: space-around;
@@ -240,26 +375,24 @@ h1 {
   margin-bottom: 0;
 }
 
-/* inner row: image + multiplier side by side */
 .visual-inner {
   display: flex;
-  align-items: center;      /* vertical centre alignment */
+  align-items: center;
   justify-content: center;
   gap: 28px;
-  margin-top: 72px;         /* space between title and image row */
+  margin-top: 72px;
 }
 
-/* IMAGE SIZING + VERTICAL CENTRING */
 .unit-image-wrapper {
   max-width: 100%;
-  height: 230px;           /* default height */
+  height: 230px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .unit-image-wrapper.wide {
-  height: 300px;           /* for any wide images if you use them */
+  height: 300px;
 }
 
 .unit-image-wrapper img {
@@ -271,14 +404,13 @@ h1 {
   max-width: 80px;
 }
 
-/* MULTIPLIER TEXT (hand-drawn feel) */
 .visual-multiplier {
   font-size: 2.4rem;
   font-weight: 700;
   font-family: "Comic Neue", "Comic Sans MS", "Marker Felt", cursive,
     system-ui, -apple-system, sans-serif;
-  white-space: nowrap;   /* keep "× 32" on one line */
-  flex-shrink: 0;        /* don’t squash it so it wraps */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* CHALLENGE PANEL ------------------------------------------------- */
@@ -304,9 +436,7 @@ h1 {
   cursor: default;
 }
 
-/* MISC ------------------------------------------------------------ */
-.hidden { display: none; }
-
+/* RESPONSIVE ------------------------------------------------------ */
 @media (max-width: 800px) {
   :root {
     --cell-width: 110px;
@@ -314,6 +444,7 @@ h1 {
   }
   .pv-label { height: 140px; }
   .pv-digit { font-size: 2.3rem; }
+  .pv-input-display { font-size: 2.1rem; }
   .unit-image-wrapper {
     height: 190px;
   }
@@ -327,6 +458,11 @@ h1 {
 </style>
 </head>
 <body>
+
+<p class="page-instruction">
+  Enter values for each place value to build your number.
+</p>
+
 <div class="app-container">
 
   <div class="app-header">
@@ -338,25 +474,31 @@ h1 {
     </div>
   </div>
 
-  <div class="top-row">
-    <label>Enter a whole number (up to 6 digits):</label>
-    <input id="numberInput" placeholder="e.g. 325541" />
-  </div>
-  <div id="errorMessage"></div>
-
+  <!-- PLACE VALUE GRID -->
   <div class="pv-wrapper">
     <div id="pvGrid" class="pv-grid"></div>
   </div>
 
-  <div class="split-slider-row">
+  <!-- BUTTONS -->
+  <div class="action-row">
+    <button id="resetBtn">Reset</button>
+    <button id="animateBtn">Animate</button>
+    <button id="returnBtn" class="hidden">Return to input</button>
+    <button id="enterBtn">Enter</button>
+  </div>
+
+  <div id="errorMessage"></div>
+
+  <!-- SLIDER (hidden until Enter/Animate pressed) -->
+  <div id="sliderRow" class="split-slider-row hidden">
     <div class="split-slider-label">Drag to choose a split:</div>
     <div class="split-slider-container">
-      <!-- now supports 6 positions (0–5) -->
       <input type="range" id="splitSlider" min="0" max="5" value="3" />
     </div>
   </div>
 
-  <div id="resultRow" class="result-row hidden"></div>
+  <!-- RESULT + VISUALS -->
+  <div id="resultRow" class="result-row hidden" aria-live="polite"></div>
 
   <div id="visualsRow" class="visuals-row hidden">
     <div class="visual-block" id="leftVisualBlock">
@@ -387,9 +529,21 @@ const placeNames = [
   "ones"
 ];
 
-const inputEl = document.getElementById("numberInput");
-const errorEl = document.getElementById("errorMessage");
+const placeValues = [100000, 10000, 1000, 100, 10, 1];
+
+// small base-10 images for the extra row
+const base10Images = {
+  0: "img-hundred-thousands.png",
+  1: "img-ten-thousands.png",
+  2: "img-thousands.png",
+  3: "img-hundreds.png",
+  4: "img-tens.png",
+  5: "img-ones.png"
+};
+
 const gridEl = document.getElementById("pvGrid");
+const errorEl = document.getElementById("errorMessage");
+const sliderRow = document.getElementById("sliderRow");
 const splitSlider = document.getElementById("splitSlider");
 const resultRow = document.getElementById("resultRow");
 const visualsRow = document.getElementById("visualsRow");
@@ -404,59 +558,219 @@ const rightMultiplier = document.getElementById("rightMultiplier");
 const exploreBtn = document.getElementById("exploreBtn");
 const challengeBtn = document.getElementById("challengeBtn");
 const flashBtn = document.getElementById("flashBtn");
+const enterBtn = document.getElementById("enterBtn");
+const returnBtn = document.getElementById("returnBtn");
+const resetBtn = document.getElementById("resetBtn");
+const animateBtn = document.getElementById("animateBtn");
 
+let isInputMode = true;
 let currentMode = "explore";
 let currentValue = null;
-let digits = "";
 let challengeRevealed = false;
+let originalInputs = new Array(placeNames.length).fill("");
+let finalCounts = new Array(placeNames.length).fill(0);
 
+// live counts while typing (for image row in input mode)
+let inputCounts = new Array(placeNames.length).fill(0);
+
+// animation state for reversible regroup
+let isAnimating = false;
+let hasAnimated = false;
+let animationSteps = []; // recorded forward steps for undo
+
+/* UTILITIES ------------------------------------------------------- */
 function formatWithSpaces(n) {
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
 function setError(msg) {
-  errorEl.style.display = msg ? "block" : "none";
-  errorEl.textContent = msg;
+  if (msg) {
+    errorEl.style.display = "block";
+    errorEl.textContent = msg;
+  } else {
+    errorEl.style.display = "none";
+    errorEl.textContent = "";
+  }
 }
 
-function parseInput() {
-  const raw = inputEl.value.replace(/,/g, "").trim();
-  if (!raw) {
-    currentValue = null;
-    digits = "";
-    setError("");
-    return;
-  }
-  if (!/^\d+$/.test(raw)) {
-    currentValue = null;
-    digits = "";
-    setError("Digits only.");
-    return;
-  }
-  if (raw.length > 6) {
-    currentValue = null;
-    digits = "";
-    setError("Max 6 digits.");
-    return;
-  }
-  const n = Number(raw);
-  if (n <= 0) {
-    currentValue = null;
-    digits = "";
-    setError("Enter a positive number.");
-    return;
-  }
-  currentValue = n;
-  digits = raw;
-  setError("");
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function renderGrid() {
+function setSliderEnabled(enabled) {
+  splitSlider.disabled = !enabled;
+  splitSlider.style.opacity = enabled ? "1" : "0.4";
+}
+
+/* IMAGE ROW HELPERS ---------------------------------------------- */
+/* show images for every non-leading place between
+   the first and last non-zero digit. */
+function refreshImageRowForCounts(counts) {
+  const cols = gridEl.querySelectorAll(".pv-column");
+  if (!cols.length) return;
+
+  const len = counts.length;
+  const allZero = counts.every(v => v === 0);
+
+  // if everything is zero, keep the whole image row blank
+  if (allZero) {
+    for (let i = 0; i < len; i++) {
+      const imgCell = cols[i].querySelector(".pv-image");
+      if (imgCell) imgCell.innerHTML = "";
+    }
+    return;
+  }
+
+  let firstNonZero = -1;
+  let lastNonZero = -1;
+  for (let i = 0; i < len; i++) {
+    if (counts[i] !== 0 && firstNonZero === -1) firstNonZero = i;
+    if (counts[i] !== 0) lastNonZero = i;
+  }
+  if (firstNonZero === -1) {
+    firstNonZero = len - 1;
+    lastNonZero = len - 1;
+  }
+
+  for (let i = 0; i < len; i++) {
+    const imgCell = cols[i].querySelector(".pv-image");
+    if (!imgCell) continue;
+    imgCell.innerHTML = "";
+
+    // hide true leading zeros and far-right unused places
+    if (i < firstNonZero || i > lastNonZero) continue;
+
+    // for non-leading places, ALWAYS show the base-10 image
+    const wrapper = document.createElement("div");
+    wrapper.className = "pv-image-inner";
+    const img = document.createElement("img");
+    img.src = base10Images[i];
+    wrapper.appendChild(img);
+    imgCell.appendChild(wrapper);
+  }
+}
+
+/* INPUT DISPLAY (red groups + blue ones) ------------------------- */
+function updateInputDisplay(index, value) {
+  const display = gridEl.querySelector(
+    `.pv-input-display[data-index="${index}"]`
+  );
+  if (!display) return;
+
+  display.innerHTML = "";
+
+  let str;
+  if (value === 0 || value === "0") {
+    str = "0";
+  } else if (value === "" || value == null) {
+    str = "";
+  } else {
+    str = String(value).trim();
+  }
+
+  if (!str) return;
+
+  const len = str.length;
+  for (let i = 0; i < len; i++) {
+    const span = document.createElement("span");
+    span.textContent = str[i];
+    if (i === len - 1) {
+      span.className = "pv-multi-blue";   // ones digit (blue)
+    } else {
+      span.className = "pv-multi-red";    // groups (red)
+    }
+    display.appendChild(span);
+  }
+}
+
+/* GRID RENDERING -------------------------------------------------- */
+function renderInputGrid() {
   gridEl.innerHTML = "";
-  if (!currentValue) return;
+  const places = placeNames.length;
+
+  // rebuild inputCounts from originalInputs when returning to input
+  inputCounts = new Array(places).fill(0);
+
+  for (let i = 0; i < places; i++) {
+    const col = document.createElement("div");
+    col.className = "pv-column";
+
+    const label = document.createElement("div");
+    label.className = "pv-cell pv-label";
+    label.innerHTML = `<span>${placeNames[i]}</span>`;
+
+    const inputCell = document.createElement("div");
+    inputCell.className = "pv-cell pv-digit";
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.max = "999";
+    input.step = "1";
+    input.className = "pv-input";
+    input.dataset.index = i;
+
+    // restore stored value (if any)
+    if (originalInputs[i] !== "" && originalInputs[i] != null) {
+      input.value = originalInputs[i];
+      inputCounts[i] = Number(originalInputs[i]);
+    } else {
+      input.value = "";
+    }
+
+    const display = document.createElement("div");
+    display.className = "pv-input-display";
+    display.dataset.index = i;
+
+    input.addEventListener("input", () => {
+      input.value = input.value.replace(/\D/g, "");
+      if (input.value.length > 3) {
+        input.value = input.value.slice(0, 3);
+      }
+
+      if (input.value === "") {
+        originalInputs[i] = "";
+        inputCounts[i] = 0;
+      } else {
+        const n = Number(input.value);
+        originalInputs[i] = n;
+        inputCounts[i] = n;
+      }
+
+      updateInputDisplay(i, input.value);
+      refreshImageRowForCounts(inputCounts);
+    });
+
+    inputCell.appendChild(input);
+    inputCell.appendChild(display);
+
+    // image row cell
+    const imageCell = document.createElement("div");
+    imageCell.className = "pv-cell pv-image";
+
+    col.append(label, inputCell, imageCell);
+    gridEl.append(col);
+
+    // initial overlay display
+    updateInputDisplay(i, input.value);
+  }
+
+  refreshImageRowForCounts(inputCounts);
+}
+
+function renderDigitGrid() {
+  gridEl.innerHTML = "";
+  if (currentValue === null) return;
 
   const places = placeNames.length;
-  const pad = digits.padStart(places, " ");
+  const counts = finalCounts || new Array(places).fill(0);
+
+  // find first non-zero so leading places can be blanked
+  let firstNonZero = counts.findIndex(v => v !== 0);
+  if (firstNonZero === -1) {
+    firstNonZero = places - 1; // show 0 in ones only
+  }
+
   for (let i = 0; i < places; i++) {
     const col = document.createElement("div");
     col.className = "pv-column";
@@ -467,18 +781,41 @@ function renderGrid() {
 
     const digitCell = document.createElement("div");
     digitCell.className = "pv-cell pv-digit";
-    digitCell.textContent = pad[i] === " " ? "0" : pad[i];
-    if (pad[i] === " ") digitCell.classList.add("empty");
 
-    col.append(label, digitCell);
+    const val = counts[i];
+
+    if (i < firstNonZero) {
+      digitCell.textContent = "0";
+      digitCell.classList.add("empty");
+    } else {
+      digitCell.textContent = String(val);
+    }
+
+    const imageCell = document.createElement("div");
+    imageCell.className = "pv-cell pv-image";
+
+    col.append(label, digitCell, imageCell);
     gridEl.append(col);
   }
+
+  refreshImageRowForCounts(counts);
 }
 
+function renderGrid() {
+  if (isInputMode) {
+    renderInputGrid();
+  } else {
+    renderDigitGrid();
+  }
+  updateGridSplitHighlight();
+}
+
+/* SPLIT + PARTITION LOGIC ---------------------------------------- */
 function updateGridSplitHighlight() {
   const cols = gridEl.querySelectorAll(".pv-column");
   cols.forEach(col => col.classList.remove("split-left"));
 
+  if (isInputMode) return;
   if (currentMode === "challenge" && !challengeRevealed) return;
 
   const idx = Number(splitSlider.value);
@@ -488,10 +825,10 @@ function updateGridSplitHighlight() {
 }
 
 function getSplitData() {
-  if (!currentValue && currentValue !== 0) return null;
+  if (currentValue === null) return null;
   const idx = Number(splitSlider.value);
   const places = placeNames.length;
-  const maxPower = places - 1;   // e.g. 6 places -> maxPower = 5
+  const maxPower = places - 1;
   const power = maxPower - idx;
   const base = 10 ** power;
   const leftCount = Math.floor(currentValue / base);
@@ -500,11 +837,10 @@ function getSplitData() {
   return { idx, leftCount, rightCount, leftLabel, places };
 }
 
-/* ---------------------- EXPLORE MODE ---------------------------- */
+/* EXPLORE MODE ---------------------------------------------------- */
 function updateExploreView() {
-  if (!currentValue) {
+  if (currentValue === null) {
     resultRow.classList.add("hidden");
-    visualsRow.classList.add("hidden");
     return;
   }
 
@@ -544,19 +880,9 @@ function updateExploreView() {
   leftImageWrapper.innerHTML = "";
   rightImageWrapper.innerHTML = "";
 
-  const imgs = {
-    0: "img-hundred-thousands.png",
-    1: "img-ten-thousands.png",
-    2: "img-thousands.png",
-    3: "img-hundreds.png",
-    4: "img-tens.png",
-    5: "img-ones.png"
-  };
-
-  // left image (toggle wide class only if you use a wide asset)
-  leftImageWrapper.classList.toggle("wide", false); // set to (idx === 0) if your 100k image is wide
+  leftImageWrapper.classList.toggle("wide", false);
   const leftImg = document.createElement("img");
-  leftImg.src = imgs[idx];
+  leftImg.src = base10Images[idx];
   leftImageWrapper.appendChild(leftImg);
 
   if (idx === lastIndex || rightCount === 0) {
@@ -565,11 +891,10 @@ function updateExploreView() {
   } else {
     rightVisualBlock.classList.remove("hidden");
     const r = document.createElement("img");
-    r.src = "img-ones.png";
+    r.src = base10Images[5]; // ones
     rightImageWrapper.appendChild(r);
   }
 
-  /* multipliers in explore mode */
   leftMultiplier.textContent = `× ${leftCount}`;
   if (idx === lastIndex || rightCount === 0) {
     rightMultiplier.textContent = "";
@@ -580,7 +905,7 @@ function updateExploreView() {
   visualsRow.classList.remove("hidden");
 }
 
-/* ---------------------- CHALLENGE MODE -------------------------- */
+/* CHALLENGE MODE -------------------------------------------------- */
 function buildChallengeRowHTML(show) {
   const data = getSplitData();
   if (!data) return "";
@@ -629,7 +954,7 @@ function buildChallengeRowHTML(show) {
 }
 
 function updateChallengeView() {
-  if (!currentValue) {
+  if (currentValue === null) {
     resultRow.classList.add("hidden");
     visualsRow.classList.add("hidden");
     return;
@@ -657,18 +982,9 @@ function updateChallengeView() {
   leftImageWrapper.innerHTML = "";
   rightImageWrapper.innerHTML = "";
 
-  const imgs = {
-    0: "img-hundred-thousands.png",
-    1: "img-ten-thousands.png",
-    2: "img-thousands.png",
-    3: "img-hundreds.png",
-    4: "img-tens.png",
-    5: "img-ones.png"
-  };
-
-  leftImageWrapper.classList.toggle("wide", false); // set to (idx === 0) if using a wide 100k image
+  leftImageWrapper.classList.toggle("wide", false);
   const leftImg = document.createElement("img");
-  leftImg.src = imgs[idx];
+  leftImg.src = base10Images[idx];
   leftImageWrapper.appendChild(leftImg);
 
   if (idx === lastIndex || rightCount === 0) {
@@ -677,15 +993,11 @@ function updateChallengeView() {
   } else {
     rightVisualBlock.classList.remove("hidden");
     const r = document.createElement("img");
-    r.src = "img-ones.png";
+    r.src = base10Images[5]; // ones
     rightImageWrapper.appendChild(r);
   }
 
-  /* multipliers in challenge mode */
-  if (idx === lastIndex) {
-    leftMultiplier.textContent = challengeRevealed ? `× ${leftCount}` : "× ?";
-    rightMultiplier.textContent = "";
-  } else if (rightCount === 0) {
+  if (idx === lastIndex || rightCount === 0) {
     leftMultiplier.textContent = challengeRevealed ? `× ${leftCount}` : "× ?";
     rightMultiplier.textContent = "";
   } else {
@@ -696,34 +1008,384 @@ function updateChallengeView() {
   visualsRow.classList.remove("hidden");
 }
 
-/* ------------------------- UPDATE ALL --------------------------- */
+/* UPDATE ALL ------------------------------------------------------ */
 function updateAll() {
   renderGrid();
-  updateGridSplitHighlight();
-  if (!currentValue) {
+  if (isInputMode) {
     resultRow.classList.add("hidden");
     visualsRow.classList.add("hidden");
-    leftMultiplier.textContent = "";
-    rightMultiplier.textContent = "";
     return;
   }
-  if (currentMode === "explore") updateExploreView();
-  else updateChallengeView();
+
+  updateGridSplitHighlight();
+
+  if (currentMode === "explore") {
+    updateExploreView();
+  } else {
+    updateChallengeView();
+  }
+}
+
+/* INPUT + REGROUPING ---------------------------------------------- */
+function readInputCounts() {
+  const inputs = gridEl.querySelectorAll(".pv-input");
+  if (inputs.length !== placeNames.length) {
+    return { ok: false, error: "Grid not ready." };
+  }
+
+  const raw = [];
+  const counts = [];
+  let nonZeroSeen = false;
+
+  for (let i = 0; i < inputs.length; i++) {
+    const txt = inputs[i].value.trim();
+    if (txt === "") {
+      raw.push("");
+      counts.push(0);
+      continue;
+    }
+    const n = Number(txt);
+    if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+      return { ok: false, error: "Please use whole numbers (0–999) in each column." };
+    }
+    if (n > 999) {
+      return { ok: false, error: "No more than three digits (0–999) allowed in each cell." };
+    }
+    raw.push(n);
+    counts.push(n);
+    if (n !== 0) nonZeroSeen = true;
+  }
+
+  if (!nonZeroSeen) {
+    return { ok: false, error: "Enter at least one non-zero value to make a number." };
+  }
+
+  return { ok: true, raw, counts };
+}
+
+function regroupCounts(counts) {
+  const temp = counts.slice();
+  for (let i = temp.length - 1; i > 0; i--) {
+    const val = temp[i];
+    const carry = Math.floor(val / 10);
+    const remain = val % 10;
+    temp[i] = remain;
+    temp[i - 1] += carry;
+  }
+  let total = 0;
+  for (let i = 0; i < temp.length; i++) {
+    total += temp[i] * placeValues[i];
+  }
+  return { counts: temp, total };
+}
+
+function finishToPartitionView(total, countsArray) {
+  currentValue = total;
+  finalCounts = countsArray ? countsArray.slice() : new Array(placeNames.length).fill(0);
+  isInputMode = false;
+  challengeRevealed = false;
+  currentMode = "explore";
+  sliderRow.classList.remove("hidden");
+  setSliderEnabled(true);
+  returnBtn.classList.remove("hidden");
+  setError("");
+  updateAll();
+}
+
+/* CARRY VISUAL HELPERS ------------------------------------------- */
+function getDigitCell(index) {
+  const cols = gridEl.querySelectorAll(".pv-column");
+  if (index < 0 || index >= cols.length) return null;
+  return cols[index].querySelector(".pv-digit");
+}
+
+function setDigitCellValue(index, val) {
+  const cell = getDigitCell(index);
+  if (!cell) return;
+  cell.textContent = String(val);
+  cell.classList.remove("empty");
+}
+
+function showCarryBubble(fromIndex, text, toIndex) {
+  const fromCell = getDigitCell(fromIndex);
+  if (!fromCell) return;
+
+  const bubble = document.createElement("div");
+  bubble.className = "carry-bubble";
+  bubble.textContent = text;
+  fromCell.appendChild(bubble);
+
+  if (typeof toIndex === "number") {
+    const toCell = getDigitCell(toIndex);
+    if (toCell) {
+      const fromRect = fromCell.getBoundingClientRect();
+      const toRect = toCell.getBoundingClientRect();
+
+      const fromCenterX = fromRect.left + fromRect.width / 2;
+      const toCenterX   = toRect.left   + toRect.width   / 2;
+
+      const dx = toCenterX - fromCenterX;
+      bubble.style.setProperty("--dx", `${dx}px`);
+    }
+  }
+
+  setTimeout(() => bubble.remove(), 3500);
+}
+
+/* SEQUENTIAL REGROUP ANIMATION (FORWARD) ------------------------- */
+async function runRegroupAnimation(counts) {
+  const temp = counts.slice();
+  animationSteps = []; // clear any previous history
+
+  // show the grouped values in the input grid while animating
+  const inputs = gridEl.querySelectorAll(".pv-input");
+  for (let i = 0; i < temp.length; i++) {
+    const val = temp[i];
+    if (inputs[i]) {
+      inputs[i].value = val === 0 && originalInputs[i] === "" ? "" : String(val);
+      updateInputDisplay(i, inputs[i].value);
+    }
+  }
+  refreshImageRowForCounts(temp);
+
+  for (let i = temp.length - 1; i > 0; i--) {
+    let val = temp[i];
+    if (val <= 9) continue;
+
+    const carry = Math.floor(val / 10);
+    const remain = val % 10;
+    const leftIndex = i - 1;
+    const prevLeft = temp[leftIndex];
+
+    // record this step so we can undo later
+    animationSteps.push({
+      rightIndex: i,
+      leftIndex,
+      carry,
+      remain,
+      prevLeft,
+      newLeft: prevLeft + carry
+    });
+
+    // update right cell (show 0 if needed)
+    temp[i] = remain;
+    if (inputs[i]) {
+      inputs[i].value = String(remain);
+      updateInputDisplay(i, inputs[i].value);
+    }
+    refreshImageRowForCounts(temp);
+
+    // show carry bubble from right cell
+    showCarryBubble(i, carry, leftIndex);
+    await delay(900);
+
+    // clear left display and show "prevLeft + carry"
+    const leftCell = getDigitCell(leftIndex);
+    let ann = null;
+    if (leftCell) {
+      ann = document.createElement("div");
+      ann.className = "carry-annotation";
+      ann.textContent = `${prevLeft} + ${carry}`;
+      leftCell.appendChild(ann);
+    }
+
+    temp[leftIndex] = prevLeft + carry;
+
+    await delay(1200);
+
+    if (ann) ann.remove();
+
+    if (inputs[leftIndex]) {
+      inputs[leftIndex].value = String(temp[leftIndex]);
+      updateInputDisplay(leftIndex, inputs[leftIndex].value);
+    }
+    refreshImageRowForCounts(temp);
+
+    await delay(400);
+  }
+
+  const { counts: finalCountsAfter, total } = regroupCounts(temp);
+  finishToPartitionView(total, finalCountsAfter);
+
+  // only enable undo if there were meaningful regroup steps
+  hasAnimated = animationSteps.length > 0;
+  animateBtn.textContent = hasAnimated ? "Undo animation" : "Animate";
+}
+
+/* REVERSE REGROUP ANIMATION (UNDO) ------------------------------- */
+async function runReverseAnimation() {
+  if (!hasAnimated || !animationSteps.length) return;
+
+  const temp = finalCounts.slice();
+
+  for (let s = animationSteps.length - 1; s >= 0; s--) {
+    const { leftIndex, rightIndex, carry, remain, prevLeft } = animationSteps[s];
+
+    // annotation on the left cell showing the decomposition
+    const leftCell = getDigitCell(leftIndex);
+    let ann = null;
+    if (leftCell) {
+      ann = document.createElement("div");
+      ann.className = "carry-annotation";
+      ann.textContent = `${prevLeft} + ${carry}`;
+      leftCell.appendChild(ann);
+    }
+
+    await delay(800);
+
+    // left cell returns to prevLeft
+    temp[leftIndex] = prevLeft;
+    setDigitCellValue(leftIndex, prevLeft);
+    refreshImageRowForCounts(temp);
+
+    // carry bubble moves from left to right
+    showCarryBubble(leftIndex, carry, rightIndex);
+    await delay(900);
+
+    // right cell regains its original multi-digit group value
+    const originalRight = carry * 10 + remain;
+    temp[rightIndex] = originalRight;
+    setDigitCellValue(rightIndex, originalRight);
+    refreshImageRowForCounts(temp);
+
+    if (ann) ann.remove();
+    await delay(400);
+  }
+
+  // we’ve visually undone; now go back to INPUT MODE
+  hasAnimated = false;
+  animateBtn.textContent = "Animate";
+
+  isInputMode = true;
+  currentValue = null;
+  sliderRow.classList.add("hidden");
+  setSliderEnabled(false);
+  resultRow.classList.add("hidden");
+  visualsRow.classList.add("hidden");
+  returnBtn.classList.add("hidden");
+  setError("");
+
+  updateAll();   // re-renders using originalInputs so you can Animate again
 }
 
 /* EVENTS ---------------------------------------------------------- */
-inputEl.addEventListener("input", () => {
-  parseInput();
-  if (currentMode === "challenge") challengeRevealed = false;
+
+// Enter: instant regroup, no animation
+enterBtn.addEventListener("click", () => {
+  if (!isInputMode || isAnimating) return;
+
+  const { ok, raw, counts, error } = readInputCounts();
+  if (!ok) {
+    setError(error);
+    return;
+  }
+
+  const { counts: regrouped, total } = regroupCounts(counts);
+  originalInputs = raw.slice();
+  hasAnimated = false;
+  animateBtn.textContent = "Animate";
+  finishToPartitionView(total, regrouped);
+});
+
+// Animate: forward regroup (from input) or undo (from partition)
+animateBtn.addEventListener("click", async () => {
+  if (isAnimating) return;
+
+  // if we're in partition view and have an animation history, play it backwards
+  if (!isInputMode && hasAnimated) {
+    isAnimating = true;
+    setError("");
+    await runReverseAnimation();
+    isAnimating = false;
+    return;
+  }
+
+  // otherwise, run the forward animation from the grouped input
+  if (!isInputMode) return;
+
+  const { ok, raw, counts, error } = readInputCounts();
+  if (!ok) {
+    setError(error);
+    return;
+  }
+
+  const needsRegroup = counts.some(c => c > 9);
+  originalInputs = raw.slice();
+  setError("");
+  isAnimating = true;
+
+  if (!needsRegroup) {
+    const { counts: regrouped, total } = regroupCounts(counts);
+    finishToPartitionView(total, regrouped);
+    hasAnimated = false;
+    animateBtn.textContent = "Animate";
+    isAnimating = false;
+    return;
+  }
+
+  await runRegroupAnimation(counts);
+
+  isAnimating = false;
+});
+
+// Return to input: restore original groups
+returnBtn.addEventListener("click", () => {
+  if (isAnimating) return;
+
+  isInputMode = true;
+  currentValue = null;
+  challengeRevealed = false;
+  finalCounts = new Array(placeNames.length).fill(0);
+  sliderRow.classList.add("hidden");
+  setSliderEnabled(false);
+  resultRow.classList.add("hidden");
+  visualsRow.classList.add("hidden");
+  hasAnimated = false;
+  animateBtn.textContent = "Animate";
+  setError("");
+  updateAll();
+});
+
+// Reset: clear everything
+resetBtn.addEventListener("click", () => {
+  if (isAnimating) return;
+
+  isInputMode = true;
+  currentMode = "explore";
+  currentValue = null;
+  challengeRevealed = false;
+  originalInputs = new Array(placeNames.length).fill("");
+  finalCounts = new Array(placeNames.length).fill(0);
+  inputCounts = new Array(placeNames.length).fill(0);
+  splitSlider.value = 3;
+  sliderRow.classList.add("hidden");
+  setSliderEnabled(false);
+  resultRow.classList.add("hidden");
+  visualsRow.classList.add("hidden");
+
+  leftVisualTitle.textContent = "";
+  rightVisualTitle.textContent = "";
+  leftImageWrapper.innerHTML = "";
+  rightImageWrapper.innerHTML = "";
+  leftMultiplier.textContent = "";
+  rightMultiplier.textContent = "";
+
+  exploreBtn.classList.add("active");
+  challengeBtn.classList.remove("active");
+  hasAnimated = false;
+  animateBtn.textContent = "Animate";
+  setError("");
   updateAll();
 });
 
 splitSlider.addEventListener("input", () => {
+  if (isInputMode) return;
   if (currentMode === "challenge") challengeRevealed = false;
   updateAll();
 });
 
 window.addEventListener("keydown", (e) => {
+  if (isInputMode) return;
   if (currentMode !== "explore") return;
   let v = Number(splitSlider.value);
   const maxIndex = placeNames.length - 1;
@@ -738,32 +1400,35 @@ window.addEventListener("keydown", (e) => {
   updateAll();
 });
 
+function setMode(mode) {
+  currentMode = mode;
+  exploreBtn.classList.toggle("active", mode === "explore");
+  challengeBtn.classList.toggle("active", mode === "challenge");
+}
+
 exploreBtn.addEventListener("click", () => {
-  currentMode = "explore";
-  exploreBtn.classList.add("active");
-  challengeBtn.classList.remove("active");
+  if (isInputMode || isAnimating) return;
+  setMode("explore");
   challengeRevealed = false;
   updateAll();
 });
 
 challengeBtn.addEventListener("click", () => {
-  currentMode = "challenge";
-  exploreBtn.classList.remove("active");
-  challengeBtn.classList.add("active");
-  splitSlider.value = Math.floor(Math.random() * placeNames.length); // 0..5
+  if (isInputMode || isAnimating) return;
+  setMode("challenge");
+  splitSlider.value = Math.floor(Math.random() * placeNames.length);
   challengeRevealed = false;
   updateAll();
 });
 
-// NEW: flash cards nav
 flashBtn.addEventListener("click", () => {
+  if (isAnimating) return;
   window.location.href = "partition-flash.html";
 });
 
 /* INITIAL --------------------------------------------------------- */
-inputEl.value = "325541";
-parseInput();
-updateAll();
+setSliderEnabled(false);
+renderGrid();
 </script>
 </body>
 </html>
