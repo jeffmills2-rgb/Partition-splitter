@@ -145,7 +145,6 @@
       padding: 0 8px;
     }
 
-    /* Inline revealed answers in the sentence */
     .revealed {
       text-decoration: underline;
       color: var(--reveal-green);
@@ -299,7 +298,6 @@
       <div class="visual-block">
         <div class="visual-label" id="leftLabelText">? tens</div>
         <div class="unit-image-wrapper">
-          <!-- swap these src files for your own images -->
           <img id="leftImage" src="img-tens.png" alt="left unit" />
         </div>
         <div class="multiplier" id="leftMultiplier">× ?</div>
@@ -323,11 +321,24 @@
       Press <strong>Space</strong> for a new problem &nbsp;•&nbsp;
       Press <strong>R</strong> to reveal
     </div>
-  </div>
+
+    <!-- FOOTER (fixed properly inside card) -->
+    <div style="
+      text-align: center;
+      margin-top: 30px;
+      font-size: 0.9rem;
+      color: #555;
+    ">
+      Images generated using 
+      <a href="https://polypad.amplify.com/p" target="_blank" style="color:#2563eb; text-decoration:none;">
+        Amplify Polypad
+      </a>
+    </div>
+
+  </div> <!-- end .app -->
 
   <script>
     // ---------------- CONFIG -------------------------------------
-    // place names by digit length
     const PLACE_SETS = {
       3: ["hundreds", "tens", "ones"],
       4: ["thousands", "hundreds", "tens", "ones"],
@@ -335,16 +346,13 @@
       6: ["hundred-thousands", "ten-thousands", "thousands", "hundreds", "tens", "ones"],
     };
 
-    // allowed split indices for each level
-    // (index is which place is counted; everything to the right becomes "ones")
     const LEVEL_RULES = {
-      1: { digits: 3, splitIndices: [0, 1] },              // hundreds or tens
-      2: { digits: 4, splitIndices: [0, 1, 2] },           // thousands, hundreds, tens
-      3: { digits: 5, splitIndices: [0, 1, 2, 3] },        // ten-thousands, thousands, hundreds, tens
-      4: { digits: 6, splitIndices: [0, 1, 2, 3, 4] },     // hundred-thousands, ten-thousands, thousands, hundreds, tens (used only in mixed)
+      1: { digits: 3, splitIndices: [0, 1] },
+      2: { digits: 4, splitIndices: [0, 1, 2] },
+      3: { digits: 5, splitIndices: [0, 1, 2, 3] },
+      4: { digits: 6, splitIndices: [0, 1, 2, 3, 4] },
     };
 
-    // map place label -> image file (change any file names to match your assets)
     const PLACE_IMAGES = {
       "hundred-thousands": "img-hundred-thousands.png",
       "ten-thousands": "img-ten-thousands.png",
@@ -375,7 +383,7 @@
 
     // ---------------- STATE --------------------------------------
     let currentLevel = 1;
-    let currentQuestion = null; // { number, digits, placeLabel, leftCount, rightCount }
+    let currentQuestion = null; 
     let revealed = false;
 
     // ---------------- HELPERS ------------------------------------
@@ -389,8 +397,6 @@
 
     function chooseLevelConfig(level) {
       if (level !== 4) return LEVEL_RULES[level];
-
-      // mixed: randomly choose one of the configs 1–4 (3, 4, 5, or 6 digits)
       const pick = randInt(1, 4);
       return LEVEL_RULES[pick];
     }
@@ -408,8 +414,9 @@
         config.splitIndices[randInt(0, config.splitIndices.length - 1)];
 
       const maxPower = placeNames.length - 1;
-      const power = maxPower - splitIdx; // e.g., for tens in 3-digit: 2 -> 1 => 10s
+      const power = maxPower - splitIdx;
       const base = 10 ** power;
+
       const leftCount = Math.floor(number / base);
       const rightCount = number % base;
       const placeLabel = placeNames[splitIdx];
@@ -428,11 +435,9 @@
 
       const { number, placeLabel, leftCount, rightCount } = currentQuestion;
 
-      // main number
       questionNumberEl.textContent = formatWithSpaces(number);
       questionNumberEl.classList.toggle("revealed-green", revealed);
 
-      // question sentence
       placeLabelEl.textContent = placeLabel.replace("-", " ");
 
       if (!revealed) {
@@ -447,7 +452,6 @@
         rightValueEl.classList.add("revealed");
       }
 
-      // visuals labels
       leftLabelTextEl.textContent =
         (revealed ? leftCount : "?") + " " + placeLabel.replace("-", " ");
       rightLabelTextEl.textContent =
@@ -456,12 +460,10 @@
       leftLabelTextEl.classList.toggle("revealed-green", revealed);
       rightLabelTextEl.classList.toggle("revealed-green", revealed);
 
-      // images
       const leftImgSrc = PLACE_IMAGES[placeLabel] || PLACE_IMAGES["ones"];
       leftImageEl.src = leftImgSrc;
       rightImageEl.src = PLACE_IMAGES["ones"];
 
-      // multipliers
       leftMultiplierEl.textContent = "× " + (revealed ? leftCount : "?");
       rightMultiplierEl.textContent = "× " + (revealed ? rightCount : "?");
 
@@ -501,9 +503,7 @@
     newBtn.addEventListener("click", newProblem);
     revealBtn.addEventListener("click", revealAnswer);
 
-    // Keyboard shortcuts
     window.addEventListener("keydown", (e) => {
-      // ignore if user is typing in some input (not really present here, but safe)
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
         return;
       }
@@ -520,17 +520,7 @@
     // ---------------- INITIAL ------------------------------------
     newProblem();
   </script>
-  <div style="
-  text-align: center;
-  margin-top: 30px;
-  font-size: 0.9rem;
-  color: #555;
-">
-  Images generated using 
-  <a href="https://polypad.amplify.com/p" target="_blank" style="color:#2563eb; text-decoration:none;">
-    Amplify Polypad
-  </a>
-</div>
-
 </body>
 </html>
+
+
