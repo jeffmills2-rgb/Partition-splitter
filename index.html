@@ -196,7 +196,7 @@ h1 {
 
 /* image row cells ------------------------------------------------- */
 .pv-image {
-  height: 110px;              /* how tall the image cell is */
+  height: 110px;
 }
 
 .pv-image-inner {
@@ -312,10 +312,27 @@ h1 {
   text-align: center;
 }
 
+.split-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
 .split-slider-label {
   font-size: 0.95rem;
   color: #4b5563;
-  margin-bottom: 4px;
+}
+
+.hide-btn {
+  border-radius: 999px;
+  border: none;
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  background: #e5e7eb;
+  color: #111827;
+  cursor: pointer;
 }
 
 .split-slider-container {
@@ -429,29 +446,6 @@ h1 {
   flex-shrink: 0;
 }
 
-/* CHALLENGE PANEL ------------------------------------------------- */
-.challenge-note {
-  margin-top: 4px;
-  font-size: 0.9rem;
-  color: #4b5563;
-}
-
-#revealBtn {
-  margin-top: 10px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: none;
-  background: #2563eb;
-  color: white;
-  font-size: 0.95rem;
-  cursor: pointer;
-}
-
-#revealBtn:disabled {
-  opacity: 0.7;
-  cursor: default;
-}
-
 /* RESPONSIVE ------------------------------------------------------ */
 @media (max-width: 800px) {
   :root {
@@ -481,8 +475,8 @@ h1 {
     <h1>Partition Splitter</h1>
     <div class="mode-toggle">
       <button id="exploreBtn" class="active">Explore</button>
-      <button id="challengeBtn">Challenge</button>
       <button id="flashBtn">Flash cards</button>
+      <button id="quizBtn">Student Quiz</button>
     </div>
   </div>
 
@@ -513,7 +507,10 @@ h1 {
 
   <!-- SLIDER (hidden until fully regrouped) -->
   <div id="sliderRow" class="split-slider-row hidden">
-    <div class="split-slider-label">Drag to choose a split:</div>
+    <div class="split-slider-header">
+      <button id="hideBtn" class="hide-btn">Hide values</button>
+      <div class="split-slider-label">Drag to choose a split:</div>
+    </div>
     <div class="split-slider-container">
       <input type="range" id="splitSlider" min="0" max="5" value="3" />
     </div>
@@ -567,6 +564,7 @@ const gridEl = document.getElementById("pvGrid");
 const errorEl = document.getElementById("errorMessage");
 const sliderRow = document.getElementById("sliderRow");
 const splitSlider = document.getElementById("splitSlider");
+const hideBtn = document.getElementById("hideBtn");
 const resultRow = document.getElementById("resultRow");
 const visualsRow = document.getElementById("visualsRow");
 const leftVisualBlock = document.getElementById("leftVisualBlock");
@@ -578,8 +576,8 @@ const rightImageWrapper = document.getElementById("rightImageWrapper");
 const leftMultiplier = document.getElementById("leftMultiplier");
 const rightMultiplier = document.getElementById("rightMultiplier");
 const exploreBtn = document.getElementById("exploreBtn");
-const challengeBtn = document.getElementById("challengeBtn");
 const flashBtn = document.getElementById("flashBtn");
+const quizBtn = document.getElementById("quizBtn");
 const enterBtn = document.getElementById("enterBtn");
 const returnBtn = document.getElementById("returnBtn");
 const resetBtn = document.getElementById("resetBtn");
@@ -587,9 +585,8 @@ const animateLeftBtn = document.getElementById("animateLeftBtn");
 const animateRightBtn = document.getElementById("animateRightBtn");
 
 let isInputMode = true;
-let currentMode = "explore";
 let currentValue = null;
-let challengeRevealed = false;
+let hideValues = false;
 
 // values as typed in the input grid
 let originalInputs = new Array(placeNames.length).fill("");
@@ -631,8 +628,6 @@ function setSliderEnabled(enabled) {
 }
 
 /* IMAGE ROW HELPERS ---------------------------------------------- */
-/* show images for every non-leading place between
-   the first and last non-zero digit. */
 function refreshImageRowForCounts(counts) {
   const cols = gridEl.querySelectorAll(".pv-column");
   if (!cols.length) return;
@@ -640,7 +635,6 @@ function refreshImageRowForCounts(counts) {
   const len = counts.length;
   const allZero = counts.every(v => v === 0);
 
-  // if everything is zero, keep the whole image row blank
   if (allZero) {
     for (let i = 0; i < len; i++) {
       const imgCell = cols[i].querySelector(".pv-image");
@@ -665,16 +659,45 @@ function refreshImageRowForCounts(counts) {
     if (!imgCell) continue;
     imgCell.innerHTML = "";
 
-    // hide true leading zeros and far-right unused places
     if (i < firstNonZero || i > lastNonZero) continue;
 
-    // for non-leading places, ALWAYS show the base-10 image
     const wrapper = document.createElement("div");
     wrapper.className = "pv-image-inner";
     const img = document.createElement("img");
     img.src = base10Images[i];
     wrapper.appendChild(img);
     imgCell.appendChild(wrapper);
+  }
+}
+
+/* RENDER DIGIT CELL WITH MULTI-COLOUR ---------------------------- */
+function renderDigitCellValue(index, value, treatLeadingZero) {
+  const cols = gridEl.querySelectorAll(".pv-column");
+  if (index < 0 || index >= cols.length) return;
+  const cell = cols[index].querySelector(".pv-digit");
+  if (!cell) return;
+
+  cell.classList.remove("empty");
+  cell.innerHTML = "";
+
+  if (treatLeadingZero && value === 0) {
+    cell.textContent = "0";
+    cell.classList.add("empty");
+    return;
+  }
+
+  const str = String(value);
+  if (str.length === 1) {
+    cell.textContent = str;
+    return;
+  }
+
+  for (let i = 0; i < str.length; i++) {
+    const span = document.createElement("span");
+    span.textContent = str[i];
+    span.className = (i === str.length - 1) ? "pv-multi-blue" : "pv-multi-red";
+    span.style.marginRight = "2px";
+    cell.appendChild(span);
   }
 }
 
@@ -703,9 +726,9 @@ function updateInputDisplay(index, value) {
     const span = document.createElement("span");
     span.textContent = str[i];
     if (i === len - 1) {
-      span.className = "pv-multi-blue";   // ones digit (blue)
+      span.className = "pv-multi-blue";
     } else {
-      span.className = "pv-multi-red";    // groups (red)
+      span.className = "pv-multi-red";
     }
     display.appendChild(span);
   }
@@ -790,10 +813,9 @@ function renderDigitGrid() {
     ? currentCounts
     : new Array(places).fill(0);
 
-  // find first non-zero so leading places can be blanked
   let firstNonZero = counts.findIndex(v => v !== 0);
   if (firstNonZero === -1) {
-    firstNonZero = places - 1; // show 0 in ones only
+    firstNonZero = places - 1;
   }
 
   for (let i = 0; i < places; i++) {
@@ -807,20 +829,16 @@ function renderDigitGrid() {
     const digitCell = document.createElement("div");
     digitCell.className = "pv-cell pv-digit";
 
-    const val = counts[i];
-
-    if (i < firstNonZero) {
-      digitCell.textContent = "0";
-      digitCell.classList.add("empty");
-    } else {
-      digitCell.textContent = String(val);
-    }
+    col.append(label, digitCell);
 
     const imageCell = document.createElement("div");
     imageCell.className = "pv-cell pv-image";
+    col.appendChild(imageCell);
 
-    col.append(label, digitCell, imageCell);
     gridEl.append(col);
+
+    const treatLeading = i < firstNonZero;
+    renderDigitCellValue(i, counts[i], treatLeading);
   }
 
   refreshImageRowForCounts(counts);
@@ -842,7 +860,6 @@ function updateGridSplitHighlight() {
 
   if (isInputMode) return;
   if (!isFullyRegrouped) return;
-  if (currentMode === "challenge" && !challengeRevealed) return;
 
   const idx = Number(splitSlider.value);
   if (idx >= 0 && idx < cols.length) {
@@ -863,147 +880,50 @@ function getSplitData() {
   return { idx, leftCount, rightCount, leftLabel, places };
 }
 
-/* EXPLORE MODE ---------------------------------------------------- */
+/* EXPLORE VIEW (with hide toggle) -------------------------------- */
 function updateExploreView() {
-  if (currentValue === null) {
-    resultRow.classList.add("hidden");
-    return;
-  }
-
-  const data = getSplitData();
-  if (!data) return;
-  const { idx, leftCount, rightCount, leftLabel, places } = data;
-  const formatted = formatWithSpaces(currentValue);
-  const lastIndex = places - 1;
-
-  if (idx === lastIndex) {
-    resultRow.innerHTML = `
-      <span class="number">${formatted}</span>
-      is the same as
-      <span class="number">${leftCount}</span> ones.
-    `;
-  } else if (rightCount === 0) {
-    resultRow.innerHTML = `
-      <span class="number">${formatted}</span>
-      is the same as
-      <span class="number">${leftCount}</span> ${leftLabel}.
-    `;
-  } else {
-    resultRow.innerHTML = `
-      <span class="number">${formatted}</span>
-      is the same as
-      <span class="number">${leftCount}</span> ${leftLabel}
-      and
-      <span class="number">${rightCount}</span> ones.
-    `;
-  }
-
-  resultRow.classList.remove("hidden");
-
-  leftVisualTitle.innerHTML = `<span class="number">${leftCount}</span> ${leftLabel}`;
-  rightVisualTitle.innerHTML = `<span class="number">${rightCount}</span> ones`;
-
-  leftImageWrapper.innerHTML = "";
-  rightImageWrapper.innerHTML = "";
-
-  leftImageWrapper.classList.toggle("wide", false);
-  const leftImg = document.createElement("img");
-  leftImg.src = base10Images[idx];
-  leftImageWrapper.appendChild(leftImg);
-
-  if (idx === lastIndex || rightCount === 0) {
-    rightVisualBlock.classList.add("hidden");
-    rightMultiplier.textContent = "";
-  } else {
-    rightVisualBlock.classList.remove("hidden");
-    const r = document.createElement("img");
-    r.src = base10Images[5]; // ones
-    rightImageWrapper.appendChild(r);
-  }
-
-  leftMultiplier.textContent = `× ${leftCount}`;
-  if (idx === lastIndex || rightCount === 0) {
-    rightMultiplier.textContent = "";
-  } else {
-    rightMultiplier.textContent = `× ${rightCount}`;
-  }
-
-  visualsRow.classList.remove("hidden");
-}
-
-/* CHALLENGE MODE -------------------------------------------------- */
-function buildChallengeRowHTML(show) {
-  const data = getSplitData();
-  if (!data) return "";
-  const { idx, leftCount, rightCount, leftLabel, places } = data;
-  const formatted = formatWithSpaces(currentValue);
-  const lastIndex = places - 1;
-
-  const L = show ? leftCount : "?";
-  const R = show ? rightCount : "?";
-
-  if (idx === lastIndex) {
-    return `
-      <span class="number">${formatted}</span>
-      is the same as
-      <span class="number">${L}</span> ones.
-      <div class="challenge-note">
-        Work out the number, then click <strong>Reveal</strong>.<br/>
-        <button id="revealBtn"${show ? " disabled" : ""}>Reveal</button>
-      </div>
-    `;
-  }
-
-  if (rightCount === 0) {
-    return `
-      <span class="number">${formatted}</span>
-      is the same as
-      <span class="number">${L}</span> ${leftLabel}.
-      <div class="challenge-note">
-        Work out the number, then click <strong>Reveal</strong>.<br/>
-        <button id="revealBtn"${show ? " disabled" : ""}>Reveal</button>
-      </div>
-    `;
-  }
-
-  return `
-    <span class="number">${formatted}</span>
-    is the same as
-    <span class="number">${L}</span> ${leftLabel}
-    and
-    <span class="number">${R}</span> ones.
-    <div class="challenge-note">
-      Work out the numbers, then click <strong>Reveal</strong>.<br/>
-      <button id="revealBtn"${show ? " disabled" : ""}>Reveal</button>
-    </div>
-  `;
-}
-
-function updateChallengeView() {
-  if (currentValue === null) {
+  if (currentValue === null || !isFullyRegrouped) {
     resultRow.classList.add("hidden");
     visualsRow.classList.add("hidden");
     return;
   }
 
-  resultRow.innerHTML = buildChallengeRowHTML(challengeRevealed);
-  resultRow.classList.remove("hidden");
-
-  const btn = document.getElementById("revealBtn");
-  if (btn && !challengeRevealed) {
-    btn.addEventListener("click", () => {
-      challengeRevealed = true;
-      updateAll();
-    });
-  }
-
   const data = getSplitData();
   if (!data) return;
   const { idx, leftCount, rightCount, leftLabel, places } = data;
+  const formatted = formatWithSpaces(currentValue);
   const lastIndex = places - 1;
 
-  leftVisualTitle.innerHTML = `<span class="number">${challengeRevealed ? leftCount : "?"}</span> ${leftLabel}`;
-  rightVisualTitle.innerHTML = `<span class="number">${challengeRevealed ? rightCount : "?"}</span> ones`;
+  const show = !hideValues;
+  const L = show ? leftCount : "?";
+  const R = show ? rightCount : "?";
+
+  if (idx === lastIndex) {
+    resultRow.innerHTML = `
+      <span class="number">${formatted}</span>
+      is the same as
+      <span class="number">${L}</span> ones.
+    `;
+  } else if (rightCount === 0) {
+    resultRow.innerHTML = `
+      <span class="number">${formatted}</span>
+      is the same as
+      <span class="number">${L}</span> ${leftLabel}.
+    `;
+  } else {
+    resultRow.innerHTML = `
+      <span class="number">${formatted}</span>
+      is the same as
+      <span class="number">${L}</span> ${leftLabel}
+      and
+      <span class="number">${R}</span> ones.
+    `;
+  }
+
+  resultRow.classList.remove("hidden");
+
+  leftVisualTitle.innerHTML = `<span class="number">${L}</span> ${leftLabel}`;
+  rightVisualTitle.innerHTML = `<span class="number">${R}</span> ones`;
 
   leftImageWrapper.innerHTML = "";
   rightImageWrapper.innerHTML = "";
@@ -1023,12 +943,11 @@ function updateChallengeView() {
     rightImageWrapper.appendChild(r);
   }
 
+  leftMultiplier.textContent = show ? `× ${leftCount}` : "× ?";
   if (idx === lastIndex || rightCount === 0) {
-    leftMultiplier.textContent = challengeRevealed ? `× ${leftCount}` : "× ?";
     rightMultiplier.textContent = "";
   } else {
-    leftMultiplier.textContent = challengeRevealed ? `× ${leftCount}` : "× ?";
-    rightMultiplier.textContent = challengeRevealed ? `× ${rightCount}` : "× ?";
+    rightMultiplier.textContent = show ? `× ${rightCount}` : "× ?";
   }
 
   visualsRow.classList.remove("hidden");
@@ -1039,15 +958,16 @@ function updateSliderVisibility() {
   if (!isInputMode && isFullyRegrouped) {
     sliderRow.classList.remove("hidden");
     setSliderEnabled(true);
+    hideBtn.textContent = hideValues ? "Show values" : "Hide values";
   } else {
     sliderRow.classList.add("hidden");
     setSliderEnabled(false);
+    hideValues = false;
   }
 }
 
 function updateAnimateButtonsState() {
   if (isInputMode) {
-    // left can attempt to start animation, right has nothing to undo yet
     animateLeftBtn.disabled = false;
     animateRightBtn.disabled = true;
     return;
@@ -1069,12 +989,15 @@ function updateAll() {
     return;
   }
 
-  if (currentMode === "explore") {
-    updateExploreView();
-  } else {
-    updateChallengeView();
+  if (!isFullyRegrouped) {
+    resultRow.classList.add("hidden");
+    visualsRow.classList.add("hidden");
+    updateSliderVisibility();
+    updateAnimateButtonsState();
+    return;
   }
 
+  updateExploreView();
   updateSliderVisibility();
   updateAnimateButtonsState();
 }
@@ -1124,7 +1047,6 @@ function computeTotalFromCounts(counts) {
   return total;
 }
 
-/* Build the full sequence of regrouping steps (rightmost >9 first) */
 function computeFullStepSequence(counts) {
   const temp = counts.slice();
   const steps = [];
@@ -1169,13 +1091,6 @@ function getDigitCell(index) {
   const cols = gridEl.querySelectorAll(".pv-column");
   if (index < 0 || index >= cols.length) return null;
   return cols[index].querySelector(".pv-digit");
-}
-
-function setDigitCellValue(index, val) {
-  const cell = getDigitCell(index);
-  if (!cell) return;
-  cell.textContent = String(val);
-  cell.classList.remove("empty");
 }
 
 function showCarryBubble(fromIndex, text, toIndex) {
@@ -1224,8 +1139,7 @@ function buildAnimationFromCurrentInputs() {
 
   isInputMode = false;
   isFullyRegrouped = steps.length === 0;
-  challengeRevealed = false;
-  currentMode = "explore";
+  hideValues = false;
 
   sliderRow.classList.add("hidden");
   setSliderEnabled(false);
@@ -1241,9 +1155,8 @@ async function playForwardStep(k) {
   const step = steps[k];
   const { fromIndex, toIndex, carry, remain, prevLeft, newLeft } = step;
 
-  // update right cell
   currentCounts[fromIndex] = remain;
-  setDigitCellValue(fromIndex, remain);
+  renderDigitCellValue(fromIndex, remain, false);
 
   showCarryBubble(fromIndex, carry, toIndex);
   await delay(900);
@@ -1262,7 +1175,7 @@ async function playForwardStep(k) {
   if (ann) ann.remove();
 
   currentCounts[toIndex] = newLeft;
-  setDigitCellValue(toIndex, newLeft);
+  renderDigitCellValue(toIndex, newLeft, false);
 
   await delay(400);
 }
@@ -1285,13 +1198,13 @@ async function playBackwardStep(k) {
   await delay(800);
 
   currentCounts[toIndex] = prevLeft;
-  setDigitCellValue(toIndex, prevLeft);
+  renderDigitCellValue(toIndex, prevLeft, false);
 
   showCarryBubble(toIndex, carry, fromIndex);
   await delay(900);
 
   currentCounts[fromIndex] = originalRight;
-  setDigitCellValue(fromIndex, originalRight);
+  renderDigitCellValue(fromIndex, originalRight, false);
 
   if (ann) ann.remove();
   await delay(400);
@@ -1307,10 +1220,10 @@ enterBtn.addEventListener("click", () => {
     if (!buildAnimationFromCurrentInputs()) return;
   }
 
-  // Jump straight to final result
   currentCounts = targetCounts.slice();
   stepIndex = steps.length;
   isFullyRegrouped = true;
+  hideValues = false;
 
   updateAll();
 });
@@ -1326,6 +1239,7 @@ animateLeftBtn.addEventListener("click", async () => {
 
   if (stepIndex >= steps.length) {
     isFullyRegrouped = true;
+    hideValues = false;
     updateAll();
     return;
   }
@@ -1335,6 +1249,7 @@ animateLeftBtn.addEventListener("click", async () => {
   stepIndex++;
   if (stepIndex >= steps.length) {
     isFullyRegrouped = true;
+    hideValues = false;
   }
   isAnimating = false;
   updateAll();
@@ -1347,7 +1262,6 @@ animateRightBtn.addEventListener("click", async () => {
 
   isAnimating = true;
 
-  // if we were fully regrouped, stepping back makes it partial again
   if (isFullyRegrouped) {
     isFullyRegrouped = false;
   }
@@ -1366,14 +1280,14 @@ returnBtn.addEventListener("click", () => {
 
   isInputMode = true;
   currentValue = null;
-  challengeRevealed = false;
-  isFullyRegrouped = false;
+  hideValues = false;
 
   originalCounts = new Array(placeNames.length).fill(0);
   currentCounts = new Array(placeNames.length).fill(0);
   targetCounts = new Array(placeNames.length).fill(0);
   steps = [];
   stepIndex = 0;
+  isFullyRegrouped = false;
 
   sliderRow.classList.add("hidden");
   setSliderEnabled(false);
@@ -1390,9 +1304,8 @@ resetBtn.addEventListener("click", () => {
   if (isAnimating) return;
 
   isInputMode = true;
-  currentMode = "explore";
   currentValue = null;
-  challengeRevealed = false;
+  hideValues = false;
   originalInputs = new Array(placeNames.length).fill("");
   inputCounts = new Array(placeNames.length).fill(0);
 
@@ -1416,24 +1329,18 @@ resetBtn.addEventListener("click", () => {
   leftMultiplier.textContent = "";
   rightMultiplier.textContent = "";
 
-  exploreBtn.classList.add("active");
-  challengeBtn.classList.remove("active");
   setError("");
   updateAnimateButtonsState();
   updateAll();
 });
 
 splitSlider.addEventListener("input", () => {
-  if (isInputMode) return;
-  if (!isFullyRegrouped) return;
-  if (currentMode === "challenge") challengeRevealed = false;
+  if (isInputMode || !isFullyRegrouped) return;
   updateAll();
 });
 
 window.addEventListener("keydown", (e) => {
-  if (isInputMode) return;
-  if (!isFullyRegrouped) return;
-  if (currentMode !== "explore") return;
+  if (isInputMode || !isFullyRegrouped) return;
   let v = Number(splitSlider.value);
   const maxIndex = placeNames.length - 1;
   if (e.key === "ArrowLeft") {
@@ -1447,30 +1354,30 @@ window.addEventListener("keydown", (e) => {
   updateAll();
 });
 
-function setMode(mode) {
-  currentMode = mode;
-  exploreBtn.classList.toggle("active", mode === "explore");
-  challengeBtn.classList.toggle("active", mode === "challenge");
-}
-
-exploreBtn.addEventListener("click", () => {
-  if (isInputMode || isAnimating) return;
-  setMode("explore");
-  challengeRevealed = false;
-  updateAll();
+/* Hide / Show values toggle -------------------------------------- */
+hideBtn.addEventListener("click", () => {
+  if (isInputMode || !isFullyRegrouped) return;
+  hideValues = !hideValues;
+  hideBtn.textContent = hideValues ? "Show values" : "Hide values";
+  updateExploreView();
 });
 
-challengeBtn.addEventListener("click", () => {
-  if (isInputMode || isAnimating) return;
-  setMode("challenge");
-  splitSlider.value = Math.floor(Math.random() * placeNames.length);
-  challengeRevealed = false;
+/* Header buttons ------------------------------------------------- */
+exploreBtn.addEventListener("click", () => {
+  if (isAnimating) return;
+  // always in explore mode now; this just ensures values are shown
+  hideValues = false;
   updateAll();
 });
 
 flashBtn.addEventListener("click", () => {
   if (isAnimating) return;
   window.location.href = "partition-flash.html";
+});
+
+quizBtn.addEventListener("click", () => {
+  if (isAnimating) return;
+  window.location.href = "student-flash.html";
 });
 
 /* INITIAL --------------------------------------------------------- */
