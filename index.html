@@ -31,7 +31,7 @@ h1 {
   margin: 4px 0 12px 4px;
   font-size: 1.5rem;
   color: #1d4ed8;
-font-family: "Patrick Hand", "Gloria Hallelujah", sans-serif;
+  font-family: "Patrick Hand", "Gloria Hallelujah", sans-serif;
 }
 
 .app-container {
@@ -83,7 +83,8 @@ font-family: "Patrick Hand", "Gloria Hallelujah", sans-serif;
   gap: 10px;
 }
 
-.action-row button {
+.action-row button,
+.animate-row button {
   border: none;
   border-radius: 999px;
   padding: 8px 18px;
@@ -96,11 +97,6 @@ font-family: "Patrick Hand", "Gloria Hallelujah", sans-serif;
   color: #111827;
 }
 
-#animateBtn {
-  background: #10b981;
-  color: #ffffff;
-}
-
 #returnBtn {
   background: #e5e7eb;
   color: #111827;
@@ -109,6 +105,25 @@ font-family: "Patrick Hand", "Gloria Hallelujah", sans-serif;
 #enterBtn {
   background: #2563eb;
   color: #fff;
+}
+
+/* NEW ANIMATION ROW ---------------------------------------------- */
+.animate-row {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+#animateLeftBtn,
+#animateRightBtn {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.animate-row button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .hidden { display: none; }
@@ -481,17 +496,22 @@ font-family: "Patrick Hand", "Gloria Hallelujah", sans-serif;
     <div id="pvGrid" class="pv-grid"></div>
   </div>
 
+  <!-- NEW ANIMATION ROW -->
+  <div class="animate-row">
+    <button id="animateLeftBtn">Animate &larr;</button>
+    <button id="animateRightBtn" disabled>Animate &rarr;</button>
+  </div>
+
   <!-- BUTTONS -->
   <div class="action-row">
     <button id="resetBtn">Reset</button>
-    <button id="animateBtn">Animate</button>
     <button id="returnBtn" class="hidden">Return to input</button>
     <button id="enterBtn">Enter</button>
   </div>
 
   <div id="errorMessage"></div>
 
-  <!-- SLIDER (hidden until Enter/Animate pressed) -->
+  <!-- SLIDER (hidden until fully regrouped) -->
   <div id="sliderRow" class="split-slider-row hidden">
     <div class="split-slider-label">Drag to choose a split:</div>
     <div class="split-slider-container">
@@ -563,22 +583,28 @@ const flashBtn = document.getElementById("flashBtn");
 const enterBtn = document.getElementById("enterBtn");
 const returnBtn = document.getElementById("returnBtn");
 const resetBtn = document.getElementById("resetBtn");
-const animateBtn = document.getElementById("animateBtn");
+const animateLeftBtn = document.getElementById("animateLeftBtn");
+const animateRightBtn = document.getElementById("animateRightBtn");
 
 let isInputMode = true;
 let currentMode = "explore";
 let currentValue = null;
 let challengeRevealed = false;
+
+// values as typed in the input grid
 let originalInputs = new Array(placeNames.length).fill("");
-let finalCounts = new Array(placeNames.length).fill(0);
 
 // live counts while typing (for image row in input mode)
 let inputCounts = new Array(placeNames.length).fill(0);
 
-// animation state for reversible regroup
+// animation / regrouping state
+let originalCounts = new Array(placeNames.length).fill(0); // grouped values
+let currentCounts  = new Array(placeNames.length).fill(0); // where we are now
+let targetCounts   = new Array(placeNames.length).fill(0); // fully regrouped
+let steps = [];             // full sequence of regroup steps
+let stepIndex = 0;          // how many steps have been applied
+let isFullyRegrouped = false;
 let isAnimating = false;
-let hasAnimated = false;
-let animationSteps = []; // recorded forward steps for undo
 
 /* UTILITIES ------------------------------------------------------- */
 function formatWithSpaces(n) {
@@ -690,7 +716,6 @@ function renderInputGrid() {
   gridEl.innerHTML = "";
   const places = placeNames.length;
 
-  // rebuild inputCounts from originalInputs when returning to input
   inputCounts = new Array(places).fill(0);
 
   for (let i = 0; i < places; i++) {
@@ -712,7 +737,6 @@ function renderInputGrid() {
     input.className = "pv-input";
     input.dataset.index = i;
 
-    // restore stored value (if any)
     if (originalInputs[i] !== "" && originalInputs[i] != null) {
       input.value = originalInputs[i];
       inputCounts[i] = Number(originalInputs[i]);
@@ -746,14 +770,12 @@ function renderInputGrid() {
     inputCell.appendChild(input);
     inputCell.appendChild(display);
 
-    // image row cell
     const imageCell = document.createElement("div");
     imageCell.className = "pv-cell pv-image";
 
     col.append(label, inputCell, imageCell);
     gridEl.append(col);
 
-    // initial overlay display
     updateInputDisplay(i, input.value);
   }
 
@@ -762,10 +784,11 @@ function renderInputGrid() {
 
 function renderDigitGrid() {
   gridEl.innerHTML = "";
-  if (currentValue === null) return;
 
   const places = placeNames.length;
-  const counts = finalCounts || new Array(places).fill(0);
+  const counts = currentCounts && currentCounts.length
+    ? currentCounts
+    : new Array(places).fill(0);
 
   // find first non-zero so leading places can be blanked
   let firstNonZero = counts.findIndex(v => v !== 0);
@@ -818,6 +841,7 @@ function updateGridSplitHighlight() {
   cols.forEach(col => col.classList.remove("split-left"));
 
   if (isInputMode) return;
+  if (!isFullyRegrouped) return;
   if (currentMode === "challenge" && !challengeRevealed) return;
 
   const idx = Number(splitSlider.value);
@@ -1011,21 +1035,48 @@ function updateChallengeView() {
 }
 
 /* UPDATE ALL ------------------------------------------------------ */
+function updateSliderVisibility() {
+  if (!isInputMode && isFullyRegrouped) {
+    sliderRow.classList.remove("hidden");
+    setSliderEnabled(true);
+  } else {
+    sliderRow.classList.add("hidden");
+    setSliderEnabled(false);
+  }
+}
+
+function updateAnimateButtonsState() {
+  if (isInputMode) {
+    // left can attempt to start animation, right has nothing to undo yet
+    animateLeftBtn.disabled = false;
+    animateRightBtn.disabled = true;
+    return;
+  }
+  const canLeft = !isFullyRegrouped && stepIndex < steps.length && steps.length > 0;
+  const canRight = stepIndex > 0 && steps.length > 0;
+  animateLeftBtn.disabled = !canLeft;
+  animateRightBtn.disabled = !canRight;
+}
+
 function updateAll() {
   renderGrid();
+
   if (isInputMode) {
     resultRow.classList.add("hidden");
     visualsRow.classList.add("hidden");
+    updateSliderVisibility();
+    updateAnimateButtonsState();
     return;
   }
-
-  updateGridSplitHighlight();
 
   if (currentMode === "explore") {
     updateExploreView();
   } else {
     updateChallengeView();
   }
+
+  updateSliderVisibility();
+  updateAnimateButtonsState();
 }
 
 /* INPUT + REGROUPING ---------------------------------------------- */
@@ -1065,33 +1116,52 @@ function readInputCounts() {
   return { ok: true, raw, counts };
 }
 
-function regroupCounts(counts) {
-  const temp = counts.slice();
-  for (let i = temp.length - 1; i > 0; i--) {
-    const val = temp[i];
-    const carry = Math.floor(val / 10);
-    const remain = val % 10;
-    temp[i] = remain;
-    temp[i - 1] += carry;
-  }
+function computeTotalFromCounts(counts) {
   let total = 0;
-  for (let i = 0; i < temp.length; i++) {
-    total += temp[i] * placeValues[i];
+  for (let i = 0; i < counts.length; i++) {
+    total += counts[i] * placeValues[i];
   }
-  return { counts: temp, total };
+  return total;
 }
 
-function finishToPartitionView(total, countsArray) {
-  currentValue = total;
-  finalCounts = countsArray ? countsArray.slice() : new Array(placeNames.length).fill(0);
-  isInputMode = false;
-  challengeRevealed = false;
-  currentMode = "explore";
-  sliderRow.classList.remove("hidden");
-  setSliderEnabled(true);
-  returnBtn.classList.remove("hidden");
-  setError("");
-  updateAll();
+/* Build the full sequence of regrouping steps (rightmost >9 first) */
+function computeFullStepSequence(counts) {
+  const temp = counts.slice();
+  const steps = [];
+  const len = temp.length;
+
+  while (true) {
+    let idx = -1;
+    for (let i = len - 1; i > 0; i--) {
+      if (temp[i] > 9) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx === -1) break;
+
+    const val = temp[idx];
+    const carry = Math.floor(val / 10);
+    const remain = val % 10;
+    const leftIndex = idx - 1;
+    const prevLeft = temp[leftIndex];
+    const newLeft = prevLeft + carry;
+
+    steps.push({
+      fromIndex: idx,
+      toIndex: leftIndex,
+      carry,
+      remain,
+      prevLeft,
+      newLeft,
+      originalRight: val
+    });
+
+    temp[idx] = remain;
+    temp[leftIndex] = newLeft;
+  }
+
+  return { finalCounts: temp.slice(), steps };
 }
 
 /* CARRY VISUAL HELPERS ------------------------------------------- */
@@ -1134,216 +1204,183 @@ function showCarryBubble(fromIndex, text, toIndex) {
   setTimeout(() => bubble.remove(), 3500);
 }
 
-/* SEQUENTIAL REGROUP ANIMATION (FORWARD) ------------------------- */
-async function runRegroupAnimation(counts) {
-  const temp = counts.slice();
-  animationSteps = []; // clear any previous history
-
-  // show the grouped values in the input grid while animating
-  const inputs = gridEl.querySelectorAll(".pv-input");
-  for (let i = 0; i < temp.length; i++) {
-    const val = temp[i];
-    if (inputs[i]) {
-      inputs[i].value = val === 0 && originalInputs[i] === "" ? "" : String(val);
-      updateInputDisplay(i, inputs[i].value);
-    }
-  }
-  refreshImageRowForCounts(temp);
-
-  for (let i = temp.length - 1; i > 0; i--) {
-    let val = temp[i];
-    if (val <= 9) continue;
-
-    const carry = Math.floor(val / 10);
-    const remain = val % 10;
-    const leftIndex = i - 1;
-    const prevLeft = temp[leftIndex];
-
-    // record this step so we can undo later
-    animationSteps.push({
-      rightIndex: i,
-      leftIndex,
-      carry,
-      remain,
-      prevLeft,
-      newLeft: prevLeft + carry
-    });
-
-    // update right cell (show 0 if needed)
-    temp[i] = remain;
-    if (inputs[i]) {
-      inputs[i].value = String(remain);
-      updateInputDisplay(i, inputs[i].value);
-    }
-    refreshImageRowForCounts(temp);
-
-    // show carry bubble from right cell
-    showCarryBubble(i, carry, leftIndex);
-    await delay(900);
-
-    // clear left display and show "prevLeft + carry"
-    const leftCell = getDigitCell(leftIndex);
-    let ann = null;
-    if (leftCell) {
-      ann = document.createElement("div");
-      ann.className = "carry-annotation";
-      ann.textContent = `${prevLeft} + ${carry}`;
-      leftCell.appendChild(ann);
-    }
-
-    temp[leftIndex] = prevLeft + carry;
-
-    await delay(1200);
-
-    if (ann) ann.remove();
-
-    if (inputs[leftIndex]) {
-      inputs[leftIndex].value = String(temp[leftIndex]);
-      updateInputDisplay(leftIndex, inputs[leftIndex].value);
-    }
-    refreshImageRowForCounts(temp);
-
-    await delay(400);
+/* Prepare animation state from current input grid ---------------- */
+function buildAnimationFromCurrentInputs() {
+  const { ok, raw, counts, error } = readInputCounts();
+  if (!ok) {
+    setError(error);
+    return false;
   }
 
-  const { counts: finalCountsAfter, total } = regroupCounts(temp);
-  finishToPartitionView(total, finalCountsAfter);
+  const { finalCounts, steps: computedSteps } = computeFullStepSequence(counts);
 
-  // only enable undo if there were meaningful regroup steps
-  hasAnimated = animationSteps.length > 0;
-  animateBtn.textContent = hasAnimated ? "Undo animation" : "Animate";
-}
+  originalInputs = raw.slice();
+  originalCounts = counts.slice();
+  targetCounts = finalCounts.slice();
+  currentCounts = counts.slice();
+  steps = computedSteps;
+  stepIndex = 0;
+  currentValue = computeTotalFromCounts(counts);
 
-/* REVERSE REGROUP ANIMATION (UNDO) ------------------------------- */
-async function runReverseAnimation() {
-  if (!hasAnimated || !animationSteps.length) return;
+  isInputMode = false;
+  isFullyRegrouped = steps.length === 0;
+  challengeRevealed = false;
+  currentMode = "explore";
 
-  const temp = finalCounts.slice();
-
-  for (let s = animationSteps.length - 1; s >= 0; s--) {
-    const { leftIndex, rightIndex, carry, remain, prevLeft } = animationSteps[s];
-
-    // annotation on the left cell showing the decomposition
-    const leftCell = getDigitCell(leftIndex);
-    let ann = null;
-    if (leftCell) {
-      ann = document.createElement("div");
-      ann.className = "carry-annotation";
-      ann.textContent = `${prevLeft} + ${carry}`;
-      leftCell.appendChild(ann);
-    }
-
-    await delay(800);
-
-    // left cell returns to prevLeft
-    temp[leftIndex] = prevLeft;
-    setDigitCellValue(leftIndex, prevLeft);
-    refreshImageRowForCounts(temp);
-
-    // carry bubble moves from left to right
-    showCarryBubble(leftIndex, carry, rightIndex);
-    await delay(900);
-
-    // right cell regains its original multi-digit group value
-    const originalRight = carry * 10 + remain;
-    temp[rightIndex] = originalRight;
-    setDigitCellValue(rightIndex, originalRight);
-    refreshImageRowForCounts(temp);
-
-    if (ann) ann.remove();
-    await delay(400);
-  }
-
-  // we’ve visually undone; now go back to INPUT MODE
-  hasAnimated = false;
-  animateBtn.textContent = "Animate";
-
-  isInputMode = true;
-  currentValue = null;
   sliderRow.classList.add("hidden");
   setSliderEnabled(false);
-  resultRow.classList.add("hidden");
-  visualsRow.classList.add("hidden");
-  returnBtn.classList.add("hidden");
+  returnBtn.classList.remove("hidden");
   setError("");
 
-  updateAll();   // re-renders using originalInputs so you can Animate again
+  return true;
+}
+
+/* One forward step (Animate Left) -------------------------------- */
+async function playForwardStep(k) {
+  if (k < 0 || k >= steps.length) return;
+  const step = steps[k];
+  const { fromIndex, toIndex, carry, remain, prevLeft, newLeft } = step;
+
+  // update right cell
+  currentCounts[fromIndex] = remain;
+  setDigitCellValue(fromIndex, remain);
+
+  showCarryBubble(fromIndex, carry, toIndex);
+  await delay(900);
+
+  const leftCell = getDigitCell(toIndex);
+  let ann = null;
+  if (leftCell) {
+    ann = document.createElement("div");
+    ann.className = "carry-annotation";
+    ann.textContent = `${prevLeft} + ${carry}`;
+    leftCell.appendChild(ann);
+  }
+
+  await delay(1200);
+
+  if (ann) ann.remove();
+
+  currentCounts[toIndex] = newLeft;
+  setDigitCellValue(toIndex, newLeft);
+
+  await delay(400);
+}
+
+/* One backward step (Animate Right) ------------------------------ */
+async function playBackwardStep(k) {
+  if (k < 0 || k >= steps.length) return;
+  const step = steps[k];
+  const { fromIndex, toIndex, carry, remain, prevLeft, newLeft, originalRight } = step;
+
+  const leftCell = getDigitCell(toIndex);
+  let ann = null;
+  if (leftCell) {
+    ann = document.createElement("div");
+    ann.className = "carry-annotation";
+    ann.textContent = `${prevLeft} + ${carry}`;
+    leftCell.appendChild(ann);
+  }
+
+  await delay(800);
+
+  currentCounts[toIndex] = prevLeft;
+  setDigitCellValue(toIndex, prevLeft);
+
+  showCarryBubble(toIndex, carry, fromIndex);
+  await delay(900);
+
+  currentCounts[fromIndex] = originalRight;
+  setDigitCellValue(fromIndex, originalRight);
+
+  if (ann) ann.remove();
+  await delay(400);
 }
 
 /* EVENTS ---------------------------------------------------------- */
 
-// Enter: instant regroup, no animation
+// Enter: go straight to fully regrouped view
 enterBtn.addEventListener("click", () => {
-  if (!isInputMode || isAnimating) return;
-
-  const { ok, raw, counts, error } = readInputCounts();
-  if (!ok) {
-    setError(error);
-    return;
-  }
-
-  const { counts: regrouped, total } = regroupCounts(counts);
-  originalInputs = raw.slice();
-  hasAnimated = false;
-  animateBtn.textContent = "Animate";
-  finishToPartitionView(total, regrouped);
-});
-
-// Animate: forward regroup (from input) or undo (from partition)
-animateBtn.addEventListener("click", async () => {
   if (isAnimating) return;
 
-  // if we're in partition view and have an animation history, play it backwards
-  if (!isInputMode && hasAnimated) {
-    isAnimating = true;
-    setError("");
-    await runReverseAnimation();
-    isAnimating = false;
-    return;
+  if (isInputMode) {
+    if (!buildAnimationFromCurrentInputs()) return;
   }
 
-  // otherwise, run the forward animation from the grouped input
-  if (!isInputMode) return;
+  // Jump straight to final result
+  currentCounts = targetCounts.slice();
+  stepIndex = steps.length;
+  isFullyRegrouped = true;
 
-  const { ok, raw, counts, error } = readInputCounts();
-  if (!ok) {
-    setError(error);
-    return;
-  }
-
-  const needsRegroup = counts.some(c => c > 9);
-  originalInputs = raw.slice();
-  setError("");
-  isAnimating = true;
-
-  if (!needsRegroup) {
-    const { counts: regrouped, total } = regroupCounts(counts);
-    finishToPartitionView(total, regrouped);
-    hasAnimated = false;
-    animateBtn.textContent = "Animate";
-    isAnimating = false;
-    return;
-  }
-
-  await runRegroupAnimation(counts);
-
-  isAnimating = false;
+  updateAll();
 });
 
-// Return to input: restore original groups
+// Animate Left: one regroup step to the left
+animateLeftBtn.addEventListener("click", async () => {
+  if (isAnimating) return;
+
+  if (isInputMode) {
+    if (!buildAnimationFromCurrentInputs()) return;
+    renderDigitGrid();
+  }
+
+  if (stepIndex >= steps.length) {
+    isFullyRegrouped = true;
+    updateAll();
+    return;
+  }
+
+  isAnimating = true;
+  await playForwardStep(stepIndex);
+  stepIndex++;
+  if (stepIndex >= steps.length) {
+    isFullyRegrouped = true;
+  }
+  isAnimating = false;
+  updateAll();
+});
+
+// Animate Right: undo one regroup step
+animateRightBtn.addEventListener("click", async () => {
+  if (isAnimating || isInputMode) return;
+  if (stepIndex <= 0) return;
+
+  isAnimating = true;
+
+  // if we were fully regrouped, stepping back makes it partial again
+  if (isFullyRegrouped) {
+    isFullyRegrouped = false;
+  }
+
+  const k = stepIndex - 1;
+  await playBackwardStep(k);
+  stepIndex--;
+
+  isAnimating = false;
+  updateAll();
+});
+
+// Return to input: restore typed groups
 returnBtn.addEventListener("click", () => {
   if (isAnimating) return;
 
   isInputMode = true;
   currentValue = null;
   challengeRevealed = false;
-  finalCounts = new Array(placeNames.length).fill(0);
+  isFullyRegrouped = false;
+
+  originalCounts = new Array(placeNames.length).fill(0);
+  currentCounts = new Array(placeNames.length).fill(0);
+  targetCounts = new Array(placeNames.length).fill(0);
+  steps = [];
+  stepIndex = 0;
+
   sliderRow.classList.add("hidden");
   setSliderEnabled(false);
   resultRow.classList.add("hidden");
   visualsRow.classList.add("hidden");
-  hasAnimated = false;
-  animateBtn.textContent = "Animate";
+
+  updateAnimateButtonsState();
   setError("");
   updateAll();
 });
@@ -1357,8 +1394,15 @@ resetBtn.addEventListener("click", () => {
   currentValue = null;
   challengeRevealed = false;
   originalInputs = new Array(placeNames.length).fill("");
-  finalCounts = new Array(placeNames.length).fill(0);
   inputCounts = new Array(placeNames.length).fill(0);
+
+  originalCounts = new Array(placeNames.length).fill(0);
+  currentCounts = new Array(placeNames.length).fill(0);
+  targetCounts = new Array(placeNames.length).fill(0);
+  steps = [];
+  stepIndex = 0;
+  isFullyRegrouped = false;
+
   splitSlider.value = 3;
   sliderRow.classList.add("hidden");
   setSliderEnabled(false);
@@ -1374,20 +1418,21 @@ resetBtn.addEventListener("click", () => {
 
   exploreBtn.classList.add("active");
   challengeBtn.classList.remove("active");
-  hasAnimated = false;
-  animateBtn.textContent = "Animate";
   setError("");
+  updateAnimateButtonsState();
   updateAll();
 });
 
 splitSlider.addEventListener("input", () => {
   if (isInputMode) return;
+  if (!isFullyRegrouped) return;
   if (currentMode === "challenge") challengeRevealed = false;
   updateAll();
 });
 
 window.addEventListener("keydown", (e) => {
   if (isInputMode) return;
+  if (!isFullyRegrouped) return;
   if (currentMode !== "explore") return;
   let v = Number(splitSlider.value);
   const maxIndex = placeNames.length - 1;
@@ -1430,6 +1475,7 @@ flashBtn.addEventListener("click", () => {
 
 /* INITIAL --------------------------------------------------------- */
 setSliderEnabled(false);
+updateAnimateButtonsState();
 renderGrid();
 </script>
 </body>
